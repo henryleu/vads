@@ -7,10 +7,10 @@ import (
 	"log"
 	"time"
 
-	wave "../../wave"
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
 	wav "github.com/faiface/beep/wav"
+	wave "github.com/henryleu/vads/wav"
 	"github.com/maxhawkins/go-webrtcvad"
 	"github.com/spf13/afero"
 )
