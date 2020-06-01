@@ -21,62 +21,53 @@ const mb = 1024 * 1024
 var fs = afero.NewMemMapFs()
 
 func main() {
-	filename := "../data/16khz-16bits-1.wav"
+	// filename := "../data/16khz-16bits-5.wav"
+	filename := "../data/8ef79f2695c811ea.wav"
 
 	r, err := wave.NewReader(filename)
 	checkErr(err)
+	format := r.FmtChunk.Data
 	fmt.Printf("NumSamples: %d\n", r.NumSamples)
 	fmt.Printf("SampleTime: %d\n", r.SampleTime)
-	fmt.Printf("FmtChunk.Data.Channel: %v\n", r.FmtChunk.Data.Channel)
-	fmt.Printf("FmtChunk.Data.SamplesPerSec: %v\n", r.FmtChunk.Data.SamplesPerSec)
-	fmt.Printf("FmtChunk.Data.BytesPerSec: %v\n", r.FmtChunk.Data.BytesPerSec)
-	fmt.Printf("FmtChunk.Data.BlockSize: %v\n", r.FmtChunk.Data.BlockSize)
-	fmt.Printf("FmtChunk.Data.BitsPerSamples: %v\n", r.FmtChunk.Data.BitsPerSamples)
-	checkErr(err)
-	defer r.Close()
-	return
-	rate := int(r.FmtChunk.Data.Rate)
-	if wavInfo.Channels != 1 {
+	fmt.Printf("FmtChunk.Data.Channel: %v\n", format.Channel)
+	fmt.Printf("FmtChunk.Data.SamplesPerSec: %v\n", format.SamplesPerSec)
+	fmt.Printf("FmtChunk.Data.BytesPerSec: %v\n", format.BytesPerSec)
+	fmt.Printf("FmtChunk.Data.BlockSize: %v\n", format.BlockSize)
+	fmt.Printf("FmtChunk.Data.BitsPerSamples: %v\n", format.BitsPerSamples)
+
+	if format.Channel != 1 {
 		log.Fatal("expected mono file")
 	}
-	if rate != 16000 {
-		log.Fatal("expected 16kHz file")
-	}
+	// if format.SamplesPerSec != 16000 {
+	// 	log.Fatal("expected 16kHz file")
+	// }
 
 	vad, err := webrtcvad.New()
 	checkErr(err)
 
-	err = vad.SetMode(0)
+	err = vad.SetMode(2)
 	checkErr(err)
 
-	frameLength := 160
+	frameLength := 80
 	frameDepth := 2
 	frame := make([]byte, frameLength*frameDepth)
-
-	// if ok := vad.ValidRateAndFrameLength(rate, len(frame)); !ok {
-	// 	log.Fatal("invalid rate or frame length")
-	// }
-
-	var isActive bool
+	var isActive bool = true
 	var offset int
-
-	fmt.Println()
-	// buf := NewBuffer(mb)
-	// bio := bufio.NewReadWriter(bufio.NewReader(buf), bufio.NewWriter(buf))
-	// processedFile, err := fs.Create("/tmp/vad.wav")
 
 	wf, err := NewWaveFile(fs)
 	checkErr(err)
-	meta := wav.File{
-		Channels:        1,
-		SampleRate:      wavInfo.SampleRate,
-		SignificantBits: wavInfo.SignificantBits,
+	param := wave.WriterParam{
+		Out:           wf,
+		Channel:       int(format.Channel),
+		SampleRate:    int(format.SamplesPerSec),
+		BitsPerSample: int(format.BitsPerSamples),
 	}
-	w, err := meta.NewWriter(wf)
+	w, err := wave.NewWriter(param)
 	checkErr(err)
 
+	rate := int(format.SamplesPerSec)
 	for {
-		_, err := io.ReadFull(reader, frame)
+		_, err := io.ReadFull(r, frame)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			break
 		}
@@ -95,13 +86,15 @@ func main() {
 		}
 		report(frameActive, offset, rate)
 		isActive = frameActive
-		// if isActive != frameActive || offset == 0 {
-		// 	isActive = frameActive
-		// 	report(isActive, offset, rate)
-		// }
+		if isActive != frameActive || offset == 0 {
+			isActive = frameActive
+			// break
+		}
 
 		offset += len(frame)
 	}
+	err = w.Close()
+	checkErr(err)
 
 	wn := wf.Name()
 	fmt.Println("name: ", wn)
@@ -118,24 +111,6 @@ func main() {
 func NewBuffer(cap int) *bytes.Buffer {
 	buf := make([]byte, 0, cap)
 	return bytes.NewBuffer(buf)
-}
-
-// NewWaveWriter is
-func NewWaveWriter(Channels uint16, SampleRate uint32, SignificantBits uint16, fs afero.Fs) (*wav.Writer, error) {
-	meta := &wav.File{
-		Channels:        Channels,
-		SampleRate:      SampleRate,
-		SignificantBits: SignificantBits,
-	}
-
-	dir := "vad"
-	pattern := "vad-"
-	f, err := afero.TempFile(fs, dir, pattern)
-	if err != nil {
-		return nil, err
-	}
-
-	return meta.NewWriter(f)
 }
 
 // NewWaveFile is

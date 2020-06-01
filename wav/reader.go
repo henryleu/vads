@@ -97,13 +97,14 @@ func (rd *Reader) parseRiffChunk() error {
 	if err := binary.Read(rd.input, binary.LittleEndian, chunkSize); err != nil {
 		return err
 	}
-	if chunkSize.ChunkSize+8 != uint32(rd.size) {
-		//		fmt.Println("======================")
-		//		fmt.Println("riff chunk size ", rd.riffChunk.ChunkSize)
-		//		fmt.Println("file size ", rd.size)
-		//		fmt.Println("======================")
-		return fmt.Errorf("riff_chunk_size must be whole file size - 8bytes, expected(%d), actual(%d)", chunkSize.ChunkSize+8, rd.size)
-	}
+	fmt.Printf("%d  %d\n", chunkSize.ChunkSize+8, rd.size)
+	// if chunkSize.ChunkSize+8 != uint32(rd.size) {
+	// 	//		fmt.Println("======================")
+	// 	//		fmt.Println("riff chunk size ", rd.riffChunk.ChunkSize)
+	// 	//		fmt.Println("file size ", rd.size)
+	// 	//		fmt.Println("======================")
+	// 	return fmt.Errorf("riff_chunk_size must be whole file size - 8bytes, expected(%d), actual(%d)", chunkSize.ChunkSize+8, rd.size)
+	// }
 
 	// RIFFフォーマットデータタイプチェック 'WAVE' と書かれているかどうか
 	format := make([]byte, 4)
