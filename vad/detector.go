@@ -1,7 +1,9 @@
 package vad
 
 import (
-	vad "github.com/maxhawkins/go-webrtcvad"
+	"fmt"
+
+	webrtcvad "github.com/maxhawkins/go-webrtcvad"
 )
 
 // State is the detector's status during voice activity detecting
@@ -59,8 +61,8 @@ type Detector struct {
 	// Duration is the duration spent in current state. By default, 0
 	Duration int
 
-	// NoInputTimeout is no input timeout. By default, 5000 (ms)
-	NoInputTimeout int
+	// NonputTimeout is no input timeout. By default, 5000 (ms)
+	NonputTimeout int
 
 	// NoInputDuration is the duration spent during no input state (inactivity state).
 	// By default, 0 (ms)
@@ -89,67 +91,26 @@ type Detector struct {
 	// BitsPerSample defines bits per sample for linear pcm
 	BitsPerSample int
 
-	// FrameTimeBase defines Codec frame time base in msec
-	FrameTimeBase int
+	// FrameTime defines Codec frame time in msec. It should be 10ms, 20ms or 30ms. By default, 20 (ms).
+	FrameTime int
 
 	// vad is WebRTC VAD processor
-	vad *vad.VAD
+	vad *webrtcvad.VAD
 
 	sampleCount    int
 	vadSampleCount int
-	speechDuration int
+	// speechDuration int
 
 	debug bool
 	work  bool
 }
-
-// Mode is the aggressiveness mode for vad and there are only 4 modes supported.
-// 0: vad normal;
-// 1: vad low bitrate;
-// 2: vad aggressive;
-// 3: vad very aggressive;
-// By default, 3 is used because it is good at anti background noise.
-type Mode int
-
-const (
-
-	// VADNormal is normal
-	VADNormal = 0
-
-	// VADLowBitrate is low bitrate
-	VADLowBitrate = 1
-
-	// VADAggressive is aggressive
-	VADAggressive = 2
-
-	// VADVeryAggressive is very aggressive
-	VADVeryAggressive = 3
-)
-
-const (
-
-	// SampleRate8 is for 8KHZ sample rate
-	SampleRate8 = 8000
-
-	// SampleRate16 is for 16KHZ sample rate
-	SampleRate16 = 16000
-
-	// BytesPerSample defines bytes per sample for linear pcm
-	BytesPerSample = 2
-
-	// BitsPerSample defines bits per sample for linear pcm
-	BitsPerSample = 16
-
-	// FrameTimeBase defines Codec frame time base in msec
-	FrameTimeBase = 10
-)
 
 // DefaultDetector is
 var defaultDetector = Detector{
 	State:               StateInactivity,
 	SpeechTimeout:       300,
 	SilenceTimeout:      300,
-	NoInputTimeout:      5000,
+	NonputTimeout:       5000,
 	Duration:            0,
 	NoInputDuration:     0,
 	RecognitionTimeout:  20000,
@@ -158,12 +119,44 @@ var defaultDetector = Detector{
 	SampleRate:          SampleRate8,
 	BytesPerSample:      BytesPerSample,
 	BitsPerSample:       BitsPerSample,
-	FrameTimeBase:       FrameTimeBase,
+	FrameTime:           FrameTimeBase * 2,
 }
 
 // NewDetector creates
 func NewDetector() *Detector {
 	detector := defaultDetector
-
 	return &detector
+}
+
+// Init initiates vad and check configuration
+func (d *Detector) Init() error {
+	vad, err := webrtcvad.New()
+	if err != nil {
+		// todo logging and wrap error
+		return err
+	}
+
+	if d.VADMode != VADNormal && d.VADMode != VADLowBitrate && d.VADMode != VADAggressive && d.VADMode != VADVeryAggressive {
+		// todo logging and wrap error
+		return fmt.Errorf("Detector.VADMode should be 0, 1, 2 or 3, got %d", d.VADMode)
+	}
+
+	err = vad.SetMode(int(d.VADMode))
+	if err != nil {
+		// todo logging and wrap error
+		return err
+	}
+	d.vad = vad
+
+	if d.SampleRate != SampleRate8 && d.SampleRate != SampleRate16 {
+		// todo logging and wrap error
+		return fmt.Errorf("Detector.SampleRate should be 8000 or 16000, got %d", d.SampleRate)
+	}
+
+	if d.FrameTime != FrameTime10 && d.FrameTime != FrameTime20 && d.FrameTime != FrameTime30 {
+		// todo logging and wrap error
+		return fmt.Errorf("Detector.FrameTime should be 10, 20 or 30, got %d", d.FrameTime)
+	}
+
+	return nil
 }
