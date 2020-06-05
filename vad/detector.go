@@ -25,12 +25,12 @@ const (
 	StateActivity
 )
 
-// Event defines events of activity detector
-type Event int
+// EventType defines events of activity detector
+type EventType int
 
 const (
 	// EventNone means no event occurred
-	EventNone Event = iota
+	EventNone EventType = iota
 
 	// EventActivity means voice activity  (transition to activity from inactivity state)
 	EventActivity
@@ -43,14 +43,22 @@ const (
 )
 
 const (
-	topVolumeValve = 0.8
+	topSampleRatio = 0.8
 
-	bottomVolumeValve = 0.2
+	bottomSampleRatio = 0.2
 
 	cacheSecond = 16000 // frame cache for one second
 
 	cacheCap = cacheSecond * 10 // frame cache for 10 seconds
+
+	singleClipCap = 1
+
+	multipleCap = 8
 )
+
+// Event is emitted in the process of speech detection
+type Event struct {
+}
 
 // Detector detects voice from voice stream based on FSM (finite state machine)
 // and VAD library ported from WebRTC
@@ -58,26 +66,30 @@ type Detector struct {
 	// Config contains the all the parameters for tuning and controling the detector's behaviors
 	*Config
 
-	// State is the state of the detector. By default, StateInactivity.
-	State State
+	// Events is a channel for eventing
+	Events chan *Event
 
-	// Duration is the duration spent in current state. By default, 0
-	Duration int
+	// duration is the duration spent in current state. By default, 0
+	duration int
 
-	// NoinputDuration is the duration spent during no input state (inactivity state).
+	// noinputDuration is the duration spent during no input state (inactivity state).
 	// By default, 0 (ms)
-	NoinputDuration int
+	noinputDuration int
 
-	// RecognitionDuration is the duration spent during activity and inactivity transition state.
+	// recognitionDuration is the duration spent during activity and inactivity transition state.
 	// By default, 0 (ms)
-	RecognitionDuration int
+	recognitionDuration int
+
+	// state is the state of the detector. By default, StateInactivity.
+	state State
 
 	// vad is WebRTC VAD processor
 	vad *webrtcvad.VAD
 
 	sampleCount, vadSampleCount int
 
-	speechStart, speechEnd int
+	// the index of the starting point of current speech in the cache
+	cliphStart int
 
 	// bytes per millisecond based sample rate and sample depth (bytes per sample)
 	bytesPerMillisecond int
@@ -89,18 +101,21 @@ type Detector struct {
 
 	// frame cache for all incoming samples
 	cache []byte
+
+	// all the detected voice clips is here. if Detector.Config.Multiple is false,
+	// there is only one clip in it, or there maybe several clips here.
+	clips []*Clip
 }
 
 // DefaultDetector is
 var defaultDetector = Detector{
-	State:               StateInactivity,
-	Duration:            0,
-	NoinputDuration:     0,
-	RecognitionDuration: 0,
+	state:               StateInactivity,
+	duration:            0,
+	noinputDuration:     0,
+	recognitionDuration: 0,
 	sampleCount:         0,
 	vadSampleCount:      0,
-	speechStart:         0,
-	speechEnd:           0,
+	cliphStart:          0,
 	work:                true,
 }
 
@@ -108,7 +123,13 @@ var defaultDetector = Detector{
 func NewDetector(config *Config) *Detector {
 	d := defaultDetector
 	d.Config = config
+	d.Events = make(chan *Event, 0)
 	d.cache = make([]byte, 0, cacheCap)
+	if d.Multiple {
+		d.clips = make([]*Clip, 0, multipleCap)
+	} else {
+		d.clips = make([]*Clip, 0, singleClipCap)
+	}
 	return &d
 }
 
@@ -127,19 +148,35 @@ func (d *Detector) Init() error {
 	}
 	d.vad = vad
 
-	d.bytesPerMillisecond = d.SampleRate * d.BitsPerSample / 1000
+	d.bytesPerMillisecond = d.SampleRate * d.BytesPerSample / 1000
 
 	// todo init other resources
 	return nil
 }
 
 func (d *Detector) setState(state State) {
-	d.State = state
-	d.Duration = 0
+	d.state = state
+	d.duration = 0
 }
 
 func (d *Detector) cacheFrame(frame []byte) {
 	d.cache = append(d.cache, frame...)
+}
+
+func (d *Detector) startClip() {
+	d.cliphStart = len(d.cache) - d.duration*d.bytesPerMillisecond
+}
+
+func (d *Detector) endClip() {
+	clipEnd := len(d.cache)
+	clip := &Clip{
+		SampleRate:     d.SampleRate,
+		BytesPerSample: d.BytesPerSample,
+		Start:          d.cliphStart,
+		Time:           clipEnd - d.SampleRate,
+		Data:           d.cache[d.cliphStart:clipEnd],
+	}
+	d.clips = append(d.clips, clip)
 }
 
 // Process process the frame of incoming voice samples and generate detection event
@@ -166,31 +203,31 @@ func (d *Detector) Process(frame []byte) error {
 	// todo result and volume level checking
 
 	// check recognition timeout
-	if d.State == StateActivity || d.State == StateInactivityTransition {
-		d.RecognitionDuration += frameTime
-		if d.RecognitionDuration >= d.RecognitionTimeout {
+	if d.state == StateActivity || d.state == StateInactivityTransition {
+		d.recognitionDuration += frameTime
+		if d.recognitionDuration >= d.RecognitionTimeout {
 			d.setState(StateInactivity)
-			d.RecognitionDuration = 0
+			d.recognitionDuration = 0
 			// todo emit event(inactivity)
 			return nil
 		}
 	}
 
-	switch d.State {
+	switch d.state {
 	case StateInactivity:
 		if result {
 			// start to detect activity
 			d.sampleCount = 0
 			d.vadSampleCount = 0
-			d.setState(StateActivityTransition)
+			d.setState(StateActivityTransition) // to activity transation
 		} else {
 			if d.NoinputTimers {
-				d.Duration += frameTime
-				d.NoinputDuration += frameTime
-				if d.NoinputDuration >= d.NoinputTimeout {
+				d.duration += frameTime
+				d.noinputDuration += frameTime
+				if d.noinputDuration >= d.NoinputTimeout {
 					// detected noinput
 					// todo emit event(noinput)
-					d.NoinputDuration = 0
+					d.noinputDuration = 0
 				}
 			}
 		}
@@ -200,29 +237,28 @@ func (d *Detector) Process(frame []byte) error {
 		if result {
 			d.vadSampleCount++
 		}
-		if result || float32(d.vadSampleCount/d.sampleCount) > topVolumeValve {
-			d.Duration += frameTime
-			if d.Duration >= d.SpeechTimeout {
+		if result || float32(d.vadSampleCount/d.sampleCount) > topSampleRatio {
+			d.duration += frameTime
+			if d.duration >= d.SpeechTimeout {
 				// finally detected activity
-				// d.speechDuration = d.Duration
-				// todo record speech
-				d.setState(StateActivity)
+				d.startClip()
+				d.setState(StateActivity) // to activity
 				// todo emit event(activity)
 			}
 		} else {
-			// fallback to inactivity
-			d.NoinputDuration += frameTime
-			d.setState(StateInactivity)
+			// todo
+			d.noinputDuration += frameTime
+			d.setState(StateInactivity) // to inactivity
 		}
 		break
 	case StateActivity:
 		if result {
-			d.Duration += frameTime
+			d.duration += frameTime
 		} else {
 			// start to detect inactivity
 			d.sampleCount = 0
 			d.vadSampleCount = 0
-			d.setState(StateInactivityTransition)
+			d.setState(StateInactivityTransition) // to inactivity transation
 		}
 		break
 	case StateInactivityTransition:
@@ -230,17 +266,18 @@ func (d *Detector) Process(frame []byte) error {
 		if result {
 			d.vadSampleCount++
 		}
-		if result && float32(d.vadSampleCount/d.sampleCount) > bottomVolumeValve {
+		if result && float32(d.vadSampleCount/d.sampleCount) > bottomSampleRatio {
 			// fallback to activity
-			d.setState(StateActivity)
+			d.setState(StateActivity) // to activity
 		} else {
-			d.Duration += frameTime
-			if d.Duration >= d.SilenceTimeout {
+			d.duration += frameTime
+			if d.duration >= d.SilenceTimeout {
 				// detected inactivity
 				if !d.Multiple {
 					d.work = false
 				}
-				d.setState(StateInactivity)
+				d.endClip()
+				d.setState(StateInactivity) // to inactivity
 				// todo emit event(inactivity)
 			}
 		}
