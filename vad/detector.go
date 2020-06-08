@@ -25,23 +25,6 @@ const (
 	StateActivity
 )
 
-// EventType defines events of activity detector
-type EventType int
-
-const (
-	// EventNone means no event occurred
-	EventNone EventType = iota
-
-	// EventActivity means voice activity  (transition to activity from inactivity state)
-	EventActivity
-
-	// EventInactivity means voice inactivity (transition to activity from inactivity state)
-	EventInactivity
-
-	// EventNoInput means no input event occurred
-	EventNoInput
-)
-
 const (
 	topSampleRatio = 0.8
 
@@ -56,10 +39,6 @@ const (
 	multipleCap = 8
 )
 
-// Event is emitted in the process of speech detection
-type Event struct {
-}
-
 // Detector detects voice from voice stream based on FSM (finite state machine)
 // and VAD library ported from WebRTC
 type Detector struct {
@@ -72,13 +51,19 @@ type Detector struct {
 	// duration is the duration spent in current state. By default, 0
 	duration int
 
+	// recognitionDuration is the duration spent during activity and inactivity transition state.
+	// By default, 0 (ms)
+	recognitionDuration int
+
+	// the starting index (0-based) of current speech in the cache
+	speechStart int
+
 	// noinputDuration is the duration spent during no input state (inactivity state).
 	// By default, 0 (ms)
 	noinputDuration int
 
-	// recognitionDuration is the duration spent during activity and inactivity transition state.
-	// By default, 0 (ms)
-	recognitionDuration int
+	// the starting index (0-based) of current noinput in the cache
+	noinputStart int
 
 	// state is the state of the detector. By default, StateInactivity.
 	state State
@@ -88,11 +73,11 @@ type Detector struct {
 
 	sampleCount, vadSampleCount int
 
-	// the index of the starting point of current speech in the cache
-	cliphStart int
-
-	// bytes per millisecond based sample rate and sample depth (bytes per sample)
+	// bytes per millisecond is calculated on sample rate and sample depth (bytes per sample)
 	bytesPerMillisecond int
+
+	// bytes per frame is calculated on sample rate, sample depth and frame time
+	bytesPerFrame int
 
 	// work indicates if the detector's work is over.
 	// true is for working.
@@ -102,20 +87,25 @@ type Detector struct {
 	// frame cache for all incoming samples
 	cache []byte
 
-	// all the detected voice clips is here. if Detector.Config.Multiple is false,
-	// there is only one clip in it, or there maybe several clips here.
+	// all the detected speech clips is here when Detector.Config.Multiple is false.
 	clips []*Clip
+
+	// clip is the speech clip or noinput clip when Detector.Config.Multiple is false.
+	clip *Clip
 }
 
 // DefaultDetector is
 var defaultDetector = Detector{
 	state:               StateInactivity,
 	duration:            0,
-	noinputDuration:     0,
 	recognitionDuration: 0,
+	speechStart:         0,
+	noinputDuration:     0,
+	noinputStart:        0,
 	sampleCount:         0,
 	vadSampleCount:      0,
-	cliphStart:          0,
+	bytesPerMillisecond: 0,
+	bytesPerFrame:       0,
 	work:                true,
 }
 
@@ -148,9 +138,10 @@ func (d *Detector) Init() error {
 	}
 	d.vad = vad
 
+	// calc bytes per unit (millisecond and frame)
 	d.bytesPerMillisecond = d.SampleRate * d.BytesPerSample / 1000
+	d.bytesPerFrame = d.bytesPerMillisecond * d.FrameDuration
 
-	// todo init other resources
 	return nil
 }
 
@@ -159,39 +150,94 @@ func (d *Detector) setState(state State) {
 	d.duration = 0
 }
 
-func (d *Detector) cacheFrame(frame []byte) {
-	d.cache = append(d.cache, frame...)
+func (d *Detector) resetNoinput() {
+	d.noinputDuration = 0
+	d.noinputStart = 0
 }
 
-func (d *Detector) startClip() {
-	d.cliphStart = len(d.cache) - d.duration*d.bytesPerMillisecond
+func (d *Detector) startNoinput() {
+	d.noinputDuration = d.duration
+	d.noinputStart = len(d.cache) - d.duration*d.bytesPerMillisecond
 }
 
-func (d *Detector) endClip() {
-	clipEnd := len(d.cache)
+func (d *Detector) endNoinput() {
+	d.clip = &Clip{
+		SampleRate:     d.SampleRate,
+		BytesPerSample: d.BytesPerSample,
+		Start:          d.noinputStart / d.bytesPerMillisecond,
+		Duration:       d.noinputDuration,
+		Data:           d.cache[d.noinputStart:],
+	}
+	d.resetNoinput()
+	d.resetSpeech()
+	d.work = false
+}
+
+func (d *Detector) resetSpeech() {
+	d.recognitionDuration = 0
+	d.speechStart = 0
+}
+
+func (d *Detector) startSpeech() {
+	d.resetNoinput()
+	d.recognitionDuration = d.duration
+	d.speechStart = len(d.cache) - d.duration*d.bytesPerMillisecond
+}
+
+func (d *Detector) endSpeech(transDuration int) {
+	l := len(d.cache)
+	speechEnd := l - transDuration*d.bytesPerMillisecond
 	clip := &Clip{
 		SampleRate:     d.SampleRate,
 		BytesPerSample: d.BytesPerSample,
-		Start:          d.cliphStart,
-		Time:           clipEnd - d.SampleRate,
-		Data:           d.cache[d.cliphStart:clipEnd],
+		Start:          d.speechStart / d.bytesPerMillisecond,
+		Duration:       (l-d.speechStart)/d.bytesPerMillisecond - transDuration,
+		Data:           d.cache[d.speechStart:speechEnd],
 	}
-	d.clips = append(d.clips, clip)
+	d.resetSpeech()
+	d.resetNoinput()
+	if !d.Multiple {
+		d.work = false
+		d.clip = clip
+	} else {
+		d.clips = append(d.clips, clip)
+	}
+}
+
+func (d *Detector) emitVoiceBegin() {
+	if d.Multiple {
+		return
+	}
+	d.Events <- &Event{Type: EventVoiceBegin}
+}
+
+func (d *Detector) emitVoiceEnd() {
+	if d.Multiple {
+		return
+	}
+	d.Events <- &Event{Type: EventVoiceEnd, Clip: d.clip}
+}
+
+func (d *Detector) emitNoinput() {
+	d.Events <- &Event{Type: EventNoinput, Clip: d.clip}
 }
 
 // Process process the frame of incoming voice samples and generate detection event
 func (d *Detector) Process(frame []byte) error {
 	// check if the detector is still working
-	if d.Multiple && !d.work {
+	if !d.Multiple && !d.work {
+		log.Println("ignore processing the frame since the detector stopped working")
 		return nil
 	}
 
-	// todo validate frame
-
 	// calc real times in the frame
-	frameTime := len(frame) / d.bytesPerMillisecond
-
-	d.cacheFrame(frame)
+	l := len(frame)
+	if l%d.bytesPerMillisecond != 0 {
+		return fmt.Errorf("frame length is exactly divided with bytes per milliseconds, got %v", l)
+	}
+	if l%d.bytesPerFrame != 0 {
+		return fmt.Errorf("frame length is exactly divided with bytes per frame, got %v", l)
+	}
 
 	result, err := d.vad.Process(d.SampleRate, frame)
 	if err != nil {
@@ -199,17 +245,31 @@ func (d *Detector) Process(frame []byte) error {
 		log.Println(msg)
 		return errors.New(msg)
 	}
-
-	// todo result and volume level checking
+	frameDuration := l / d.bytesPerMillisecond
+	d.cache = append(d.cache, frame...)
+	d.duration += frameDuration
 
 	// check recognition timeout
 	if d.state == StateActivity || d.state == StateInactivityTransition {
-		d.recognitionDuration += frameTime
-		if d.recognitionDuration >= d.RecognitionTimeout {
-			d.setState(StateInactivity)
-			d.recognitionDuration = 0
-			// todo emit event(inactivity)
-			return nil
+		d.recognitionDuration += frameDuration
+		if !d.Multiple && d.RecognitionTimers {
+			if d.recognitionDuration >= d.RecognitionTimeout {
+				d.endSpeech(0)
+				d.emitVoiceEnd()
+				return nil
+			}
+		}
+	}
+
+	// check noinput timeout
+	if d.state == StateInactivity || d.state == StateActivityTransition {
+		d.noinputDuration += frameDuration
+		if !d.Multiple && d.NoinputTimers {
+			if d.noinputDuration >= d.NoinputTimeout {
+				d.endNoinput()
+				d.emitNoinput()
+				return nil
+			}
 		}
 	}
 
@@ -219,17 +279,7 @@ func (d *Detector) Process(frame []byte) error {
 			// start to detect activity
 			d.sampleCount = 0
 			d.vadSampleCount = 0
-			d.setState(StateActivityTransition) // to activity transation
-		} else {
-			if d.NoinputTimers {
-				d.duration += frameTime
-				d.noinputDuration += frameTime
-				if d.noinputDuration >= d.NoinputTimeout {
-					// detected noinput
-					// todo emit event(noinput)
-					d.noinputDuration = 0
-				}
-			}
+			d.setState(StateActivityTransition)
 		}
 		break
 	case StateActivityTransition:
@@ -238,27 +288,23 @@ func (d *Detector) Process(frame []byte) error {
 			d.vadSampleCount++
 		}
 		if result || float32(d.vadSampleCount/d.sampleCount) > topSampleRatio {
-			d.duration += frameTime
 			if d.duration >= d.SpeechTimeout {
 				// finally detected activity
-				d.startClip()
-				d.setState(StateActivity) // to activity
-				// todo emit event(activity)
+				d.startSpeech()
+				d.setState(StateActivity)
+				d.emitVoiceBegin()
 			}
 		} else {
-			// todo
-			d.noinputDuration += frameTime
-			d.setState(StateInactivity) // to inactivity
+			// fall back to inactivity
+			d.setState(StateInactivity)
 		}
 		break
 	case StateActivity:
-		if result {
-			d.duration += frameTime
-		} else {
+		if !result {
 			// start to detect inactivity
 			d.sampleCount = 0
 			d.vadSampleCount = 0
-			d.setState(StateInactivityTransition) // to inactivity transation
+			d.setState(StateInactivityTransition)
 		}
 		break
 	case StateInactivityTransition:
@@ -268,127 +314,17 @@ func (d *Detector) Process(frame []byte) error {
 		}
 		if result && float32(d.vadSampleCount/d.sampleCount) > bottomSampleRatio {
 			// fallback to activity
-			d.setState(StateActivity) // to activity
+			d.setState(StateActivity)
 		} else {
-			d.duration += frameTime
 			if d.duration >= d.SilenceTimeout {
 				// detected inactivity
-				if !d.Multiple {
-					d.work = false
-				}
-				d.endClip()
-				d.setState(StateInactivity) // to inactivity
-				// todo emit event(inactivity)
+				d.endSpeech(d.duration)
+				d.startNoinput()
+				d.setState(StateInactivity)
+				d.emitVoiceEnd()
 			}
 		}
-
 		break
 	}
 	return nil
-	/*
-
-		  mpf_detector_event_e det_event = MPF_DETECTOR_EVENT_NONE;
-		  if (detector->work == FALSE) {
-		    return det_event;
-		  }
-
-		  apt_bool_t result = FALSE;
-		  int time_base = CODEC_FRAME_TIME_BASE;
-		  apr_size_t level = mpf_activity_detector_level_calculate(frame);
-		  int vad = WebRtcVad_Process(detector->vad_inst,
-		                              detector->voice_rate,
-		                              frame->codec_frame.buffer,
-		                              frame->codec_frame.size / 2,
-		                              1);
-
-		  if (level >= detector->level_threshold && vad == 1) {
-		    result = TRUE;
-		  }
-
-		  if (detector->state == DETECTOR_STATE_ACTIVITY || detector->state == DETECTOR_STATE_INACTIVITY_TRANSITION) {
-		    detector->recognition_duration += time_base;
-		    if (detector->recognition_duration >= detector->recognition_timeout) {
-		      mpf_activity_detector_state_change(detector, DETECTOR_STATE_INACTIVITY);
-		      detector->recognition_duration = 0;
-		      return MPF_DETECTOR_EVENT_INACTIVITY;
-		    }
-		  }
-
-			if (detector->debug == TRUE) {
-		    printf("voice info: level=%5d, google=%d, mrcp=%d, state=%d, duration=%dms\n",
-		           (int) level,
-		           vad,
-		           result,
-		           detector->state,
-		           (int) detector->recognition_duration);
-		  }
-	*/
-
-	/*
-	  if (detector->state == DETECTOR_STATE_INACTIVITY) {
-	    if (result == TRUE) {
-	      // start to detect activity
-	      detector->sample_count = 0;
-	      detector->vad_sample_count = 0;
-	      mpf_activity_detector_state_change(detector, DETECTOR_STATE_ACTIVITY_TRANSITION);
-	    } else {
-	      if (detector->timers_started == TRUE) {
-	        detector->duration += time_base;
-	        detector->noinput_duration += time_base;
-	        if (detector->noinput_duration >= detector->noinput_timeout) {
-	          // detected noinput
-	          det_event = MPF_DETECTOR_EVENT_NOINPUT;
-	          detector->noinput_duration = 0;
-	        }
-	      }
-	    }
-	  } else if (detector->state == DETECTOR_STATE_ACTIVITY_TRANSITION) {
-	    detector->sample_count++;
-	    if (result == TRUE) {
-	      detector->vad_sample_count++;
-	    }
-	    if (result == TRUE || (float) detector->vad_sample_count / detector->sample_count > 0.8) {
-	      detector->duration += time_base;
-	      if (detector->duration >= detector->speech_timeout) {
-	        // finally detected activity
-	        detector->speech_duration = detector->duration;
-	        det_event = MPF_DETECTOR_EVENT_ACTIVITY;
-	        mpf_activity_detector_state_change(detector, DETECTOR_STATE_ACTIVITY);
-	      }
-	    } else {
-	      // fallback to inactivity
-	      detector->noinput_duration += time_base;
-	      mpf_activity_detector_state_change(detector, DETECTOR_STATE_INACTIVITY);
-	    }
-	  } else if (detector->state == DETECTOR_STATE_ACTIVITY) {
-	    if (result == TRUE) {
-	      detector->duration += time_base;
-	    } else {
-	      // start to detect inactivity
-	      detector->sample_count = 0;
-	      detector->vad_sample_count = 0;
-	      mpf_activity_detector_state_change(detector, DETECTOR_STATE_INACTIVITY_TRANSITION);
-	    }
-	  } else if (detector->state == DETECTOR_STATE_INACTIVITY_TRANSITION) {
-	    detector->sample_count++;
-	    if (result == TRUE) {
-	      detector->vad_sample_count++;
-	    }
-	    if (result == TRUE && (float) detector->vad_sample_count / detector->sample_count > 0.2) {
-	      // fallback to activity
-	      mpf_activity_detector_state_change(detector, DETECTOR_STATE_ACTIVITY);
-	    } else {
-	      detector->duration += time_base;
-	      if (detector->duration >= detector->silence_timeout) {
-	        // detected inactivity
-	        det_event = MPF_DETECTOR_EVENT_INACTIVITY;
-	        detector->work = FALSE;
-	        mpf_activity_detector_state_change(detector, DETECTOR_STATE_INACTIVITY);
-	      }
-	    }
-	  }
-
-	  return det_event;
-
-	*/
 }

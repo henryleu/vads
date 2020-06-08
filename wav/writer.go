@@ -7,6 +7,7 @@ import (
 	"io"
 )
 
+// WriterParam defines the parameters for creating a new writer
 type WriterParam struct {
 	Out           io.WriteCloser
 	Channel       int
@@ -14,15 +15,17 @@ type WriterParam struct {
 	BitsPerSample int
 }
 
+// Writer defines a writer to write data to a wave file
 type Writer struct {
-	out            io.WriteCloser // 実際に書きだすファイルや bytes など
-	writtenSamples int            // 書き込んだサンプル数
+	out            io.WriteCloser // the interface of the created file to write
+	writtenSamples int            // the number of samples written
 
 	riffChunk *RiffChunk
 	fmtChunk  *FmtChunk
 	dataChunk *DataWriterChunk
 }
 
+// NewWriter creates and writes wave data to a wave file.
 func NewWriter(param WriterParam) (*Writer, error) {
 	w := &Writer{}
 	w.out = param.Out
@@ -58,6 +61,7 @@ func NewWriter(param WriterParam) (*Writer, error) {
 	return w, nil
 }
 
+// WriteSample8 writes uint8 slice samples to the writer
 func (w *Writer) WriteSample8(samples []uint8) (int, error) {
 	buf := new(bytes.Buffer)
 
@@ -71,6 +75,7 @@ func (w *Writer) WriteSample8(samples []uint8) (int, error) {
 	return n, err
 }
 
+// WriteSample16 writes int16 slice samples to the writer
 func (w *Writer) WriteSample16(samples []int16) (int, error) {
 	buf := new(bytes.Buffer)
 
@@ -84,16 +89,14 @@ func (w *Writer) WriteSample16(samples []int16) (int, error) {
 	return n, err
 }
 
-func (w *Writer) WriteSample24(samples []byte) (int, error) {
-	return 0, fmt.Errorf("WriteSample24 is not implemented")
-}
-
+// Write writes byte slice as samples to the writer
 func (w *Writer) Write(p []byte) (int, error) {
 	blockSize := int(w.fmtChunk.Data.BlockSize)
 	if len(p) < blockSize {
 		return 0, fmt.Errorf("writing data need at least %d bytes", blockSize)
 	}
-	// 書き込みbyte数は BlockSize の倍数
+
+	// The number of write bytes is a multiple of BlockSize
 	if len(p)%blockSize != 0 {
 		return 0, fmt.Errorf("writing data must be a multiple of %d bytes", blockSize)
 	}
@@ -119,6 +122,7 @@ func (ew *errWriter) Write(order binary.ByteOrder, data interface{}) {
 	ew.err = binary.Write(ew.w, order, data)
 }
 
+// Close closes the created file
 func (w *Writer) Close() error {
 	data := w.dataChunk.Data.Bytes()
 	dataSize := uint32(len(data))

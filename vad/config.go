@@ -17,11 +17,14 @@ type Config struct {
 	// NoinputTimeout is no input timeout. By default, 5000 (ms)
 	NoinputTimeout int
 
-	// NoinputTimers is a flag indicates if timer is on. By default, true
+	// NoinputTimers is a flag indicates if noinput timer is on. By default, true
 	NoinputTimers bool
 
 	// RecognitionTimeout is recognition timeout. By default, 20000 (ms)
 	RecognitionTimeout int
+
+	// RecognitionTimers is a flag indicates if recognition timer is on. By default, true
+	RecognitionTimers bool
 
 	// VADLevel is the aggressiveness mode for vad. By default, 3 for anti background noise
 	VADLevel VADLevel
@@ -36,8 +39,9 @@ type Config struct {
 	// BitsPerSample defines bits per sample for linear pcm
 	BitsPerSample int
 
-	// FrameTime defines Codec frame time in msec. It should be 10ms, 20ms or 30ms. By default, 20 (ms).
-	FrameTime int
+	// FrameDuration defines Codec frame time spent in msec.
+	// It should be 10ms, 20ms or 30ms. By default, 20 (ms).
+	FrameDuration int
 
 	// Multiple means if the detector is used to detect multiple speeches.
 	// true is for processing a record wave file.
@@ -82,17 +86,14 @@ const (
 	// BitsPerSample defines bits per sample for linear pcm
 	BitsPerSample = 16
 
-	// FrameTimeBase defines Codec frame time base in msec
-	FrameTimeBase = 10
+	// FrameDuration10 is 10ms
+	FrameDuration10 = 10
 
-	// FrameTime10 is 10ms
-	FrameTime10 = FrameTimeBase
+	// FrameDuration20 is 20ms
+	FrameDuration20 = 20
 
-	// FrameTime20 is 20ms
-	FrameTime20 = FrameTimeBase * 2
-
-	// FrameTime30 is 30ms
-	FrameTime30 = FrameTimeBase * 3
+	// FrameDuration30 is 30ms
+	FrameDuration30 = 30
 )
 
 // DefaultConfig is
@@ -102,11 +103,12 @@ var defaultConfig = Config{
 	NoinputTimeout:     5000,
 	NoinputTimers:      true,
 	RecognitionTimeout: 20000,
+	RecognitionTimers:  true,
 	VADLevel:           VADVeryAggressive,
 	SampleRate:         SampleRate8,
 	BytesPerSample:     BytesPerSample,
 	BitsPerSample:      BitsPerSample,
-	FrameTime:          FrameTime20,
+	FrameDuration:      FrameDuration20,
 	Multiple:           false,
 }
 
@@ -152,9 +154,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("Detector.BitsPerSample should be 16, got %v", c.BitsPerSample)
 	}
 
-	if c.FrameTime != FrameTime10 && c.FrameTime != FrameTime20 && c.FrameTime != FrameTime30 {
+	if c.FrameDuration != FrameDuration10 && c.FrameDuration != FrameDuration20 && c.FrameDuration != FrameDuration30 {
 		// todo logging and wrap error
-		return fmt.Errorf("Detector.FrameTime should be 10, 20 or 30, got %v", c.FrameTime)
+		return fmt.Errorf("Detector.FrameDuration should be 10, 20 or 30, got %v", c.FrameDuration)
 	}
 
 	return nil

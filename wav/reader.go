@@ -9,14 +9,16 @@ import (
 	"os"
 )
 
-type WaveReader interface {
+// File defines a File io interface to read data
+type File interface {
 	io.Reader
 	io.Seeker
 	io.ReaderAt
 }
 
+// Reader defines a struct implements WaveHeader interface
 type Reader struct {
-	input WaveReader
+	input File
 
 	size int64
 
@@ -29,10 +31,11 @@ type Reader struct {
 	ReadSampleNum     uint32
 	SampleTime        int
 
-	// LIST chunk などの可変 chunk 長を管理する変数
+	// Variable that manages variable chunk length such as LIST chunk
 	extChunkSize int64
 }
 
+// NewReader opens a file and creates a new reader of it.
 func NewReader(fileName string) (*Reader, error) {
 	// check file size
 	fi, err := os.Stat(fileName)
@@ -83,16 +86,16 @@ type csize struct {
 }
 
 func (rd *Reader) parseRiffChunk() error {
-	// RIFFフォーマットヘッダチェック
-	chunkId := make([]byte, 4)
-	if err := binary.Read(rd.input, binary.BigEndian, chunkId); err != nil {
+	// RIFF format header check
+	chunkID := make([]byte, 4)
+	if err := binary.Read(rd.input, binary.BigEndian, chunkID); err != nil {
 		return err
 	}
-	if string(chunkId[:]) != riffChunkToken {
+	if string(chunkID[:]) != riffChunkToken {
 		return fmt.Errorf("file is not RIFF: %s", rd.RiffChunk.ID)
 	}
 
-	// RIFFチャンクサイズ
+	// RIFF chunk size
 	chunkSize := &csize{}
 	if err := binary.Read(rd.input, binary.LittleEndian, chunkSize); err != nil {
 		return err
@@ -106,7 +109,7 @@ func (rd *Reader) parseRiffChunk() error {
 	// 	return fmt.Errorf("riff_chunk_size must be whole file size - 8bytes, expected(%d), actual(%d)", chunkSize.ChunkSize+8, rd.size)
 	// }
 
-	// RIFFフォーマットデータタイプチェック 'WAVE' と書かれているかどうか
+	// RIFF format data type check whether 'WAVE' is written
 	format := make([]byte, 4)
 	if err := binary.Read(rd.input, binary.BigEndian, format); err != nil {
 		return err
@@ -116,7 +119,7 @@ func (rd *Reader) parseRiffChunk() error {
 	}
 
 	riffChunk := RiffChunk{
-		ID:         chunkId,
+		ID:         chunkID,
 		Size:       chunkSize.ChunkSize,
 		FormatType: format,
 	}
@@ -129,19 +132,19 @@ func (rd *Reader) parseRiffChunk() error {
 func (rd *Reader) parseFmtChunk() error {
 	rd.input.Seek(riffChunkSize, os.SEEK_SET)
 
-	// 'fmt ' と書かれているかどうか
-	chunkId := make([]byte, 4)
-	err := binary.Read(rd.input, binary.BigEndian, chunkId)
+	// check if it is written as 'fmt'
+	chunkID := make([]byte, 4)
+	err := binary.Read(rd.input, binary.BigEndian, chunkID)
 	if err == io.EOF {
 		return fmt.Errorf("unexpected file end")
 	} else if err != nil {
 		return err
 	}
-	if string(chunkId[:]) != fmtChunkToken {
-		return fmt.Errorf("fmt chunk id must be \"%s\" but value is %s", fmtChunkToken, chunkId)
+	if string(chunkID[:]) != fmtChunkToken {
+		return fmt.Errorf("fmt chunk id must be \"%s\" but value is %s", fmtChunkToken, chunkID)
 	}
 
-	// fmt_chunk_size が 16bit か
+	// fmt_chunk_size is 16-bits
 	chunkSize := &csize{}
 	err = binary.Read(rd.input, binary.LittleEndian, chunkSize)
 	if err == io.EOF {
@@ -153,14 +156,14 @@ func (rd *Reader) parseFmtChunk() error {
 		return fmt.Errorf("fmt chunk size must be %d but value is %d", fmtChunkSize, chunkSize.ChunkSize)
 	}
 
-	// fmt_chunk_data を読みこむ
+	// read fmt_chunk_data
 	var fmtChunkData WavFmtChunkData
 	if err = binary.Read(rd.input, binary.LittleEndian, &fmtChunkData); err != nil {
 		return err
 	}
 
 	fmtChunk := FmtChunk{
-		ID:   chunkId,
+		ID:   chunkID,
 		Size: chunkSize.ChunkSize,
 		Data: &fmtChunkData,
 	}
@@ -173,18 +176,18 @@ func (rd *Reader) parseFmtChunk() error {
 func (rd *Reader) parseListChunk() error {
 	rd.input.Seek(listChunkOffset, os.SEEK_SET)
 
-	// 'LIST' と書かれているかどうか
+	// check if it is written as 'LIST'
 	chunkID := make([]byte, 4)
 	if err := binary.Read(rd.input, binary.BigEndian, chunkID); err == io.EOF {
 		return fmt.Errorf("unexpected file end")
 	} else if err != nil {
 		return err
 	} else if string(chunkID[:]) != listChunkToken {
-		// LIST チャンクは無くても特に問題はない
+		// There is no problem even if there is no LIST chunk
 		return nil
 	}
 
-	// 'LIST' のサイズは可変、先頭の 1byte にサイズが記載されている
+	// The size of 'LIST' is variable, the size is described in the first 1 byte
 	chunkSize := make([]byte, 1)
 	if err := binary.Read(rd.input, binary.LittleEndian, chunkSize); err == io.EOF {
 		return fmt.Errorf("unexpected file end")
@@ -192,14 +195,13 @@ func (rd *Reader) parseListChunk() error {
 		return err
 	}
 
-	// 可変な header 長管理変数更新
+	// Variable header length management variable update
 	// rd.extChunkSize += int64(chunkSize[0]) + 4 + 4
 	rd.extChunkSize = int64(chunkSize[0]) + 4 + 4
-
 	return nil
 }
 
-// 可変長の header サイズも加味した riffChunkSizeOffset の値を返却する
+// Returns the value of riffChunkSizeOffset that also takes the variable size header size into account
 func (rd *Reader) getRiffChunkSizeOffset() int64 {
 	return riffChunkSizeBaseOffset + rd.extChunkSize
 }
@@ -207,19 +209,19 @@ func (rd *Reader) getRiffChunkSizeOffset() int64 {
 func (rd *Reader) parseDataChunk() error {
 	originOfDataChunk, _ := rd.input.Seek(rd.getRiffChunkSizeOffset(), os.SEEK_SET)
 
-	// 'data' と書かれているかどうか
-	chunkId := make([]byte, 4)
-	err := binary.Read(rd.input, binary.BigEndian, chunkId)
+	// check if it is written as "data"
+	chunkID := make([]byte, 4)
+	err := binary.Read(rd.input, binary.BigEndian, chunkID)
 	if err == io.EOF {
 		return fmt.Errorf("unexpected file end")
 	} else if err != nil {
 		return err
 	}
-	if string(chunkId[:]) != dataChunkToken {
-		return fmt.Errorf("data chunk id must be \"%s\" but value is %s", dataChunkToken, chunkId)
+	if string(chunkID[:]) != dataChunkToken {
+		return fmt.Errorf("data chunk id must be \"%s\" but value is %s", dataChunkToken, chunkID)
 	}
 
-	// data_chunk_size(実際の音データの容量)を取得する
+	// Get data_chunk_size (actual sound data capacity)
 	chunkSize := &csize{}
 	err = binary.Read(rd.input, binary.LittleEndian, chunkSize)
 	if err == io.EOF {
@@ -228,12 +230,12 @@ func (rd *Reader) parseDataChunk() error {
 		return err
 	}
 
-	// 実際の音データは dataChunk の開始位置から IDデータ(4byte) と chunkSize(4byte)データを足した場所
+	// Actual sound data is the position where ID data (4byte) and chunkSize (4byte) data are added from the start position of dataChunk
 	rd.originOfAudioData = originOfDataChunk + 8
 	audioData := io.NewSectionReader(rd.input, rd.originOfAudioData, int64(chunkSize.ChunkSize))
 
 	dataChunk := DataReaderChunk{
-		ID:   chunkId,
+		ID:   chunkID,
 		Size: chunkSize.ChunkSize,
 		Data: audioData,
 	}
@@ -243,27 +245,29 @@ func (rd *Reader) parseDataChunk() error {
 	return nil
 }
 
-// 音声データのみ読み込む
+// reads only audio data
 func (rd *Reader) Read(p []byte) (int, error) {
 	n, err := rd.DataChunk.Data.Read(p)
 	return n, err
 }
 
+// ReadRawSample reads raw sample
 func (rd *Reader) ReadRawSample() ([]byte, error) {
 	size := rd.FmtChunk.Data.BlockSize
 	sample := make([]byte, size)
 	_, err := rd.Read(sample)
 	if err == nil {
-		rd.ReadSampleNum += 1
+		rd.ReadSampleNum++
 	}
 	return sample, err
 }
 
+// ReadSample reads sample as float64 slice
 func (rd *Reader) ReadSample() ([]float64, error) {
 	raw, err := rd.ReadRawSample()
 	channel := int(rd.FmtChunk.Data.Channel)
 	ret := make([]float64, channel)
-	length := len(raw) / channel // 1チャンネルあたりのbyte数
+	length := len(raw) / channel // the umber of bytes per channel
 
 	if err != nil {
 		return ret, err
@@ -284,11 +288,12 @@ func (rd *Reader) ReadSample() ([]float64, error) {
 	return ret, nil
 }
 
+// ReadSampleInt reads sample as int slice
 func (rd *Reader) ReadSampleInt() ([]int, error) {
 	raw, err := rd.ReadRawSample()
 	channels := int(rd.FmtChunk.Data.Channel)
 	ret := make([]int, channels)
-	length := len(raw) / channels // 1チャンネルあたりのbyte数
+	length := len(raw) / channels // the number of bytes per channel
 
 	if err != nil {
 		return ret, err
