@@ -320,7 +320,7 @@ func bytesToInt(b []byte) int {
 	//	fmt.Printf("%08b %08b ", b[1], b[0])
 	//	fmt.Printf("%016b => %d\n", ret, ret)
 	case 3:
-		// HiReso / DVDAudio
+		// HiResolusion / DVDAudio
 		ret = int(b[0]) + int(b[1])<<8 + int(b[2])<<16
 	default:
 		ret = 0

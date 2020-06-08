@@ -8,45 +8,42 @@ import (
 type Config struct {
 	// SpeechTimeout is period of activity required to complete transition
 	// to active state. By default, 300 (ms)
-	SpeechTimeout int ``
+	SpeechTimeout int `json: "speech_timeout", yaml: "speech_timeout"`
 
 	// SilenceTimeout is period of inactivity required to complete transition
 	// to inactive state. By default, 300 (ms)
-	SilenceTimeout int
+	SilenceTimeout int `json: "silence_timeout", yaml: "silence_timeout"`
 
 	// NoinputTimeout is no input timeout. By default, 5000 (ms)
-	NoinputTimeout int
+	NoinputTimeout int `json: "noinput_timeout", yaml: "noinput_timeout"`
 
 	// NoinputTimers is a flag indicates if noinput timer is on. By default, true
-	NoinputTimers bool
+	NoinputTimers bool `json: "noinput_timers", yaml: "noinput_timers"`
 
 	// RecognitionTimeout is recognition timeout. By default, 20000 (ms)
-	RecognitionTimeout int
+	RecognitionTimeout int `json: "recognition_timeout", yaml: "recognition_timeout"`
 
 	// RecognitionTimers is a flag indicates if recognition timer is on. By default, true
-	RecognitionTimers bool
+	RecognitionTimers bool `json: "recognition_timers", yaml: "recognition_timers"`
 
 	// VADLevel is the aggressiveness mode for vad. By default, 3 for anti background noise
-	VADLevel VADLevel
+	VADLevel VADLevel `json: "vad_level", yaml: "vad_level"`
 
 	// SampleRate defines the number of samples per second, aka. sample rate.
 	// It only supports 8000 and 16000.
-	SampleRate int
+	SampleRate int `json: "sample_rate", yaml: "sample_rate"`
 
 	// BytesPerSample defines bytes per sample for linear pcm
-	BytesPerSample int
-
-	// BitsPerSample defines bits per sample for linear pcm
-	BitsPerSample int
+	BytesPerSample int `json: "sample_bytes", yaml: "sample_bytes"`
 
 	// FrameDuration defines Codec frame time spent in msec.
 	// It should be 10ms, 20ms or 30ms. By default, 20 (ms).
-	FrameDuration int
+	FrameDuration int `json: "frame_duration", yaml: "frame_duration"`
 
 	// Multiple means if the detector is used to detect multiple speeches.
 	// true is for processing a record wave file.
 	// false is for processing a incoming voice stream.
-	Multiple bool
+	Multiple bool `json: "multiple", yaml: "multiple"`
 }
 
 // VADLevel is the aggressiveness level for vad and there are only 4 modes supported.
@@ -83,9 +80,6 @@ const (
 	// BytesPerSample defines bytes per sample for linear pcm
 	BytesPerSample = 2
 
-	// BitsPerSample defines bits per sample for linear pcm
-	BitsPerSample = 16
-
 	// FrameDuration10 is 10ms
 	FrameDuration10 = 10
 
@@ -107,7 +101,6 @@ var defaultConfig = Config{
 	VADLevel:           VADVeryAggressive,
 	SampleRate:         SampleRate8,
 	BytesPerSample:     BytesPerSample,
-	BitsPerSample:      BitsPerSample,
 	FrameDuration:      FrameDuration20,
 	Multiple:           false,
 }
@@ -124,14 +117,18 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("Detector.SilenceTimeout should be greater than 0, got %v", c.SilenceTimeout)
 	}
 
-	if c.NoinputTimeout <= 0 {
-		// todo logging and wrap error
-		return fmt.Errorf("Detector.NoinputTimeout should be greater than 0, got %v", c.NoinputTimeout)
+	if c.NoinputTimers {
+		if c.NoinputTimeout <= 0 {
+			// todo logging and wrap error
+			return fmt.Errorf("Detector.NoinputTimeout should be greater than 0, got %v", c.NoinputTimeout)
+		}
 	}
 
-	if c.RecognitionTimeout <= 0 {
-		// todo logging and wrap error
-		return fmt.Errorf("Detector.RecognitionTimeout should be greater than 0, got %v", c.RecognitionTimeout)
+	if c.RecognitionTimers {
+		if c.RecognitionTimeout <= 0 {
+			// todo logging and wrap error
+			return fmt.Errorf("Detector.RecognitionTimeout should be greater than 0, got %v", c.RecognitionTimeout)
+		}
 	}
 
 	if c.VADLevel != VADNormal && c.VADLevel != VADLowBitrate && c.VADLevel != VADAggressive && c.VADLevel != VADVeryAggressive {
@@ -147,11 +144,6 @@ func (c *Config) Validate() error {
 	if c.BytesPerSample != BytesPerSample {
 		// todo logging and wrap error
 		return fmt.Errorf("Detector.BytesPerSample should be 2, got %v", c.BytesPerSample)
-	}
-
-	if c.BitsPerSample != BitsPerSample {
-		// todo logging and wrap error
-		return fmt.Errorf("Detector.BitsPerSample should be 16, got %v", c.BitsPerSample)
 	}
 
 	if c.FrameDuration != FrameDuration10 && c.FrameDuration != FrameDuration20 && c.FrameDuration != FrameDuration30 {

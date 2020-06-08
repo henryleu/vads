@@ -21,42 +21,44 @@ var (
 	dataChunkToken = "data"
 )
 
-// 12byte
+// RiffChunk has 12 bytes
 type RiffChunk struct {
 	ID         []byte // 'RIFF'
 	Size       uint32 // 36bytes + data_chunk_size or whole_file_size - 'RIFF'+ChunkSize (8byte)
 	FormatType []byte // 'WAVE'
 }
 
-// 8 + 16 = 24byte
+// FmtChunk is with 8 + 16 = 24 bytes
 type FmtChunk struct {
 	ID   []byte // 'fmt '
 	Size uint32 // 16
 	Data *WavFmtChunkData
 }
 
-// 16byte
+// WavFmtChunkData is with 16 bytes
 type WavFmtChunkData struct {
 	WaveFormatType uint16 // PCM は 1
-	Channel        uint16 // monoral or streo
-	SamplesPerSec  uint32 // サンプリング周波数 44100
-	BytesPerSec    uint32 // 1秒間に必要なbyte数
-	BlockSize      uint16 // 量子化精度 * チャンネル数
-	BitsPerSamples uint16 // 量子化精度
+	Channel        uint16 // monoral or stereo
+	SamplesPerSec  uint32 // Sampling frequency: 8000, 16000 or 44100
+	BytesPerSec    uint32 // the number of bytes required per second
+	BlockSize      uint16 // Quantization accuracy * Number of channels
+	BitsPerSamples uint16
 }
 
-// data 読み込み
+// DataReader defines interface for DataReader
 type DataReader interface {
 	io.Reader
 	io.ReaderAt
 }
 
+// DataReaderChunk defines a data chunk with reader
 type DataReaderChunk struct {
 	ID   []byte     // 'data'
-	Size uint32     // 音データの長さ * channel
-	Data DataReader // 実際のデータ
+	Size uint32     // sound data length * channels
+	Data DataReader // Actual data
 }
 
+// DataWriterChunk defines a data chunk with a writer
 type DataWriterChunk struct {
 	ID   []byte
 	Size uint32
