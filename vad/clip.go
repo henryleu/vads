@@ -26,8 +26,8 @@ type Clip struct {
 	Data []byte
 }
 
-// SaveTo creates a file and write the clip to a wave file.
-func (c *Clip) SaveTo(path string) error {
+// SaveToWave creates a file and write the clip to a wave file.
+func (c *Clip) SaveToWave(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
 		log.Printf("Fail to save clip to %v, error: %v", path, err)
