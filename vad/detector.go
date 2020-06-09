@@ -43,7 +43,7 @@ const (
 // and VAD library ported from WebRTC
 type Detector struct {
 	// Config contains the all the parameters for tuning and controling the detector's behaviors
-	*Config
+	Config
 
 	// Events is a channel for eventing
 	Events chan *Event
@@ -107,10 +107,11 @@ var defaultDetector = Detector{
 	bytesPerMillisecond: 0,
 	bytesPerFrame:       0,
 	work:                true,
+	vad:                 nil,
 }
 
 // NewDetector creates
-func NewDetector(config *Config) *Detector {
+func NewDetector(config Config) *Detector {
 	d := defaultDetector
 	d.Config = config
 	d.Events = make(chan *Event, 0)
@@ -139,10 +140,25 @@ func (d *Detector) Init() error {
 	d.vad = vad
 
 	// calc bytes per unit (millisecond and frame)
-	d.bytesPerMillisecond = d.SampleRate * d.BytesPerSample / 1000
-	d.bytesPerFrame = d.bytesPerMillisecond * d.FrameDuration
+	d.bytesPerMillisecond = d.BytesPerMillisecond()
+	d.bytesPerFrame = d.BytesPerFrame()
 
 	return nil
+}
+
+// BytesPerMillisecond calc and return bytesPerMillisecond
+func (d *Detector) BytesPerMillisecond() int {
+	return d.SampleRate * d.BytesPerSample / 1000
+}
+
+// BytesPerFrame calc and return bytesPerFrame
+func (d *Detector) BytesPerFrame() int {
+	return d.BytesPerMillisecond() * d.FrameDuration
+}
+
+// Working indicates if the detector is working in single mode
+func (d *Detector) Working() bool {
+	return d.work
 }
 
 func (d *Detector) setState(state State) {
@@ -216,10 +232,12 @@ func (d *Detector) emitVoiceEnd() {
 		return
 	}
 	d.Events <- &Event{Type: EventVoiceEnd, Clip: d.clip}
+	close(d.Events)
 }
 
 func (d *Detector) emitNoinput() {
 	d.Events <- &Event{Type: EventNoinput, Clip: d.clip}
+	close(d.Events)
 }
 
 // Process process the frame of incoming voice samples and generate detection event
