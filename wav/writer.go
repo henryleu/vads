@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 )
 
 // WriterParam defines the parameters for creating a new writer
@@ -13,6 +14,13 @@ type WriterParam struct {
 	Channel       int
 	SampleRate    int
 	BitsPerSample int
+}
+
+// Debug prints debug info
+func (wp WriterParam) Debug() {
+	log.Printf("Channel:\t%v\n", wp.Channel)
+	log.Printf("SampleRate:\t%v\n", wp.SampleRate)
+	log.Printf("BitsPerSample:\t%v\n", wp.BitsPerSample)
 }
 
 // Writer defines a writer to write data to a wave file

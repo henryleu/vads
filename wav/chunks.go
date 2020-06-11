@@ -3,6 +3,7 @@ package wave
 import (
 	"bytes"
 	"io"
+	"log"
 )
 
 const (
@@ -33,6 +34,15 @@ type FmtChunk struct {
 	ID   []byte // 'fmt '
 	Size uint32 // 16
 	Data *WavFmtChunkData
+}
+
+// Debug prints debug info
+func (fc FmtChunk) Debug() {
+	log.Printf("FmtChunk.Data.Channel:\t%v\n", fc.Data.Channel)
+	log.Printf("FmtChunk.Data.SamplesPerSec:\t%v\n", fc.Data.SamplesPerSec)
+	log.Printf("FmtChunk.Data.BytesPerSec:\t%v\n", fc.Data.BytesPerSec)
+	log.Printf("FmtChunk.Data.BlockSize:\t%v\n", fc.Data.BlockSize)
+	log.Printf("FmtChunk.Data.BitsPerSamples:\t%v\n", fc.Data.BitsPerSamples)
 }
 
 // WavFmtChunkData is with 16 bytes

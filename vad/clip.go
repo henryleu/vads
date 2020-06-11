@@ -1,10 +1,12 @@
 package vad
 
 import (
+	"io"
 	"log"
 	"os"
+	"time"
 
-	"github.com/zenwerk/go-wave"
+	wav "github.com/henryleu/vads/wav"
 )
 
 // Clip defines voice clip for processing and persisting
@@ -20,30 +22,48 @@ type Clip struct {
 	Start int
 
 	// Duration defines the time span of the voice clip in milliseconds.
-	Duration int
+	Duration time.Duration
 
 	// Data is the chunk data of the voice clip as the specific sample rate and depth
 	Data []byte
 }
 
-// SaveToWave creates a file and write the clip to a wave file.
-func (c *Clip) SaveToWave(path string) error {
+// SaveToFile creates a file and write the clip to it
+func (c *Clip) SaveToFile(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
 		log.Printf("Fail to save clip to %v, error: %v", path, err)
 		return err
 	}
-	param := wave.WriterParam{
-		Out:           f,
+	return c.SaveToWriter(f)
+}
+
+// SaveToWriter creates a file and write the clip to a wave file.
+func (c *Clip) SaveToWriter(wc io.WriteCloser) error {
+	param := wav.WriterParam{
+		Out:           wc,
 		Channel:       int(1),
 		SampleRate:    int(c.SampleRate),
 		BitsPerSample: int(c.BytesPerSample * 8),
 	}
-	w, err := wave.NewWriter(param)
+	// param.Debug()
+	log.Printf("Clip SampleRate:\t%v\n", c.SampleRate)
+	log.Printf("Clip BytesPerSample:\t%v\n", c.BytesPerSample)
+	log.Printf("Clip Start:\t%v\n", c.Start)
+	log.Printf("Clip Duration:\t%v\n", c.Duration)
+
+	w, err := wav.NewWriter(param)
 	defer w.Close()
 	if err != nil {
-		log.Printf("Fail to save clip to %v, error: %v", path, err)
+		log.Printf("Fail to create a new wave clip writer, error: %v", err)
 		return err
 	}
+
+	_, err = w.Write(c.Data)
+	if err != nil {
+		log.Printf("Fail to write clip data, error: %v", err)
+		return err
+	}
+
 	return nil
 }

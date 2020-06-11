@@ -12,6 +12,12 @@ import (
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f", r)
+		}
+	}()
+
 	fn := "../data/8ef79f2695c811ea.wav"
 	// fn := "../data/16khz-16bits-5.wav"
 
@@ -19,7 +25,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("wav.NewReader() error = %v", err)
 	}
-	test.InitSpeaker(int(r.FmtChunk.Data.SamplesPerSec), 100)
 
 	c := vad.NewDefaultConfig()
 	c.SampleRate = int(r.FmtChunk.Data.SamplesPerSec)
@@ -27,9 +32,9 @@ func main() {
 	// 设置一下参数效果最佳
 	c.SilenceTimeout = 800
 	c.SpeechTimeout = 800
-	c.NoinputTimeout = 20000
 	c.VADLevel = 3
-
+	log.Printf("vad level: %v\n", c.VADLevel)
+	c.Multiple = true
 	err = c.Validate()
 	if err != nil {
 		log.Fatalf("Config.Validate() error = %v", err)
@@ -40,66 +45,55 @@ func main() {
 		log.Fatalf("Detector.Init() error = %v", err)
 	}
 
+	// 使用语音探测器切割一个音频文件
 	frame := make([]byte, d.BytesPerFrame())
-	done := make(chan bool)
-	go func() {
-		for e := range d.Events {
-			switch e.Type {
-			case vad.EventVoiceBegin:
-				fmt.Println("voice begin")
-				break
-			case vad.EventVoiceEnd:
-				fmt.Println("voice end")
-				f, err := test.NewFile()
-				e.Clip.SaveToWriter(f)
-				wn := f.Name()
-				fmt.Println("name: ", wn)
-				rf, err := test.OpenFile(wn)
-				if err != nil {
-					log.Fatalf("fs.Open() error = %v", err)
-				}
-				test.PlayWaveFile(rf)
-				done <- true
-				break
-			case vad.EventNoinput:
-				fmt.Println("no input")
-				f, err := test.NewFile()
-				e.Clip.SaveToWriter(f)
-				wn := f.Name()
-				fmt.Println("name: ", wn)
-				rf, err := test.OpenFile(wn)
-				if err != nil {
-					log.Fatalf("fs.Open() error = %v", err)
-				}
-
-				test.PlayWaveFile(rf)
-				done <- true
-				break
-			default:
-				fmt.Printf("illegal event type %v\n", e.Type)
-				done <- true
-			}
-		}
-	}()
-
 	for {
 		_, err := io.ReadFull(r, frame)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			log.Println("file is EOF")
+			log.Println(err)
 			break
 		}
 		if err != nil {
 			log.Fatalf("io.ReadFull() error = %v", err)
 		}
 		d.Process(frame)
-		if !d.Working() {
-			log.Println("detector is stopped")
-			break
-		}
 		if err != nil {
 			log.Fatalf("Detector.Process() error = %v", err)
 		}
 	}
-	<-done
+
+	fmt.Printf("clip number: %v\n", len(d.Clips))
+	test.InitSpeaker(c.SampleRate, 100)
+
+	// play all the speech clips detected
+	// 播放“分段录音”（已识别的讲话片段）
+	for i, c := range d.Clips {
+		f, err := test.NewFile()
+		wn := f.Name()
+		fmt.Printf("clip %v : %v\n", i+1, wn)
+		c.SaveToWriter(f)
+		fmt.Println()
+		rf, err := test.OpenFile(wn)
+		if err != nil {
+			log.Fatalf("fs.Open() error = %v", err)
+		}
+		test.PlayWaveFile(rf)
+		time.Sleep(time.Second * 1)
+	}
+
+	// play the total record of all the processed voice data
+	// 播放“全程录音”（所有处理过的音频数据的）
+	tc := d.GetTotalClip()
+	f, err := test.NewFile()
+	wn := f.Name()
+	fmt.Printf("original clip: %v\n", wn)
+	tc.SaveToWriter(f)
+	fmt.Println()
+	rf, err := test.OpenFile(wn)
+	if err != nil {
+		log.Fatalf("fs.Open() error = %v", err)
+	}
+	test.PlayWaveFile(rf)
+
 	time.Sleep(time.Second * 1)
 }

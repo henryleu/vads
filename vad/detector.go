@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	webrtcvad "github.com/maxhawkins/go-webrtcvad"
 )
@@ -88,10 +89,10 @@ type Detector struct {
 	cache []byte
 
 	// all the detected speech clips is here when Detector.Config.Multiple is false.
-	clips []*Clip
+	Clips []*Clip
 
-	// clip is the speech clip or noinput clip when Detector.Config.Multiple is false.
-	clip *Clip
+	// Clip is the speech clip or noinput clip when Detector.Config.Multiple is false.
+	Clip *Clip
 }
 
 // DefaultDetector is
@@ -117,9 +118,9 @@ func NewDetector(config Config) *Detector {
 	d.Events = make(chan *Event, 0)
 	d.cache = make([]byte, 0, cacheCap)
 	if d.Multiple {
-		d.clips = make([]*Clip, 0, multipleCap)
+		d.Clips = make([]*Clip, 0, multipleCap)
 	} else {
-		d.clips = make([]*Clip, 0, singleClipCap)
+		d.Clips = make([]*Clip, 0, singleClipCap)
 	}
 	return &d
 }
@@ -177,11 +178,11 @@ func (d *Detector) startNoinput() {
 }
 
 func (d *Detector) endNoinput() {
-	d.clip = &Clip{
+	d.Clip = &Clip{
 		SampleRate:     d.SampleRate,
 		BytesPerSample: d.BytesPerSample,
 		Start:          d.noinputStart / d.bytesPerMillisecond,
-		Duration:       d.noinputDuration,
+		Duration:       time.Millisecond * time.Duration(d.noinputDuration),
 		Data:           d.cache[d.noinputStart:],
 	}
 	d.resetNoinput()
@@ -203,20 +204,21 @@ func (d *Detector) startSpeech() {
 func (d *Detector) endSpeech(transDuration int) {
 	l := len(d.cache)
 	speechEnd := l - transDuration*d.bytesPerMillisecond
+	mills := (l-d.speechStart)/d.bytesPerMillisecond - transDuration
 	clip := &Clip{
 		SampleRate:     d.SampleRate,
 		BytesPerSample: d.BytesPerSample,
 		Start:          d.speechStart / d.bytesPerMillisecond,
-		Duration:       (l-d.speechStart)/d.bytesPerMillisecond - transDuration,
+		Duration:       time.Millisecond * time.Duration(mills),
 		Data:           d.cache[d.speechStart:speechEnd],
 	}
 	d.resetSpeech()
 	d.resetNoinput()
 	if !d.Multiple {
 		d.work = false
-		d.clip = clip
+		d.Clip = clip
 	} else {
-		d.clips = append(d.clips, clip)
+		d.Clips = append(d.Clips, clip)
 	}
 }
 
@@ -231,12 +233,12 @@ func (d *Detector) emitVoiceEnd() {
 	if d.Multiple {
 		return
 	}
-	d.Events <- &Event{Type: EventVoiceEnd, Clip: d.clip}
+	d.Events <- &Event{Type: EventVoiceEnd, Clip: d.Clip}
 	close(d.Events)
 }
 
 func (d *Detector) emitNoinput() {
-	d.Events <- &Event{Type: EventNoinput, Clip: d.clip}
+	d.Events <- &Event{Type: EventNoinput, Clip: d.Clip}
 	close(d.Events)
 }
 
@@ -345,4 +347,28 @@ func (d *Detector) Process(frame []byte) error {
 		break
 	}
 	return nil
+}
+
+// GetClips forces to end speech and returns all clips
+func (d *Detector) GetClips() []*Clip {
+	if !d.Multiple {
+		return []*Clip{}
+	}
+
+	if d.speechStart != 0 {
+		d.endSpeech(0)
+	}
+
+	return d.Clips
+}
+
+// GetTotalClip returns the total clip of all the buffered frame
+func (d *Detector) GetTotalClip() *Clip {
+	return &Clip{
+		SampleRate:     d.SampleRate,
+		BytesPerSample: d.BytesPerSample,
+		Start:          0,
+		Duration:       time.Millisecond * time.Duration(len(d.cache)/d.bytesPerMillisecond),
+		Data:           d.cache[:],
+	}
 }

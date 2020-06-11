@@ -35,31 +35,36 @@ type Reader struct {
 	extChunkSize int64
 }
 
-// NewReader opens a file and creates a new reader of it.
-func NewReader(fileName string) (*Reader, error) {
+// NewReaderFromFile opens a file and creates a new reader of it.
+func NewReaderFromFile(fileName string) (*Reader, error) {
 	// check file size
 	fi, err := os.Stat(fileName)
 	if err != nil {
-		return &Reader{}, err
+		return nil, err
 	}
 	if fi.Size() > maxFileSize {
-		return &Reader{}, fmt.Errorf("file is too large: %d bytes", fi.Size())
+		return nil, fmt.Errorf("file is too large: %d bytes", fi.Size())
 	}
 
 	// open file
 	f, err := os.Open(fileName)
 	if err != nil {
-		return &Reader{}, err
+		return nil, err
 	}
 	defer f.Close()
 
-	waveData, err := ioutil.ReadAll(f)
+	return NewReader(f)
+}
+
+// NewReader creates a Reader from a io.Reader of a file
+func NewReader(r io.Reader) (*Reader, error) {
+	waveData, err := ioutil.ReadAll(r)
 	if err != nil {
-		return &Reader{}, err
+		return nil, err
 	}
 
 	reader := new(Reader)
-	reader.size = fi.Size()
+	// reader.size = fi.Size()
 	reader.input = bytes.NewReader(waveData)
 
 	if err := reader.parseRiffChunk(); err != nil {
