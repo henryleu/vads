@@ -115,7 +115,7 @@ var defaultDetector = Detector{
 func NewDetector(config Config) *Detector {
 	d := defaultDetector
 	d.Config = config
-	d.Events = make(chan *Event, 0)
+	d.Events = make(chan *Event, 2)
 	d.cache = make([]byte, 0, cacheCap)
 	if d.Multiple {
 		d.Clips = make([]*Clip, 0, multipleCap)
@@ -234,12 +234,12 @@ func (d *Detector) emitVoiceEnd() {
 		return
 	}
 	d.Events <- &Event{Type: EventVoiceEnd, Clip: d.Clip}
-	close(d.Events)
+	// close(d.Events)
 }
 
 func (d *Detector) emitNoinput() {
 	d.Events <- &Event{Type: EventNoinput, Clip: d.Clip}
-	close(d.Events)
+	// close(d.Events)
 }
 
 // Process process the frame of incoming voice samples and generate detection event
