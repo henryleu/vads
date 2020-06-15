@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-
-	"github.com/henryleu/vads/hly"
+	"vads/hly"
 )
 
-var addr = flag.String("addr", "localhost:6000", "http service address")
+var addr = flag.String("addr", "0.0.0.0:6000", "http service address")
 
 func main() {
 	flag.Parse()

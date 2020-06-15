@@ -2,15 +2,16 @@ package hly
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"strconv"
-	"text/template"
-	"time"
-
 	"github.com/gorilla/websocket"
 	vad "github.com/henryleu/vads/vad"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"text/template"
+	"time"
+	"vads/hly/util"
 )
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -48,6 +49,19 @@ func sendCloseMessage(c *websocket.Conn, code int, msg string) {
 		c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, msg))
 	}
 	time.Sleep(closeGracePeriod)
+}
+
+// return success response-message
+func sendResponseMessage(wire *Wire, req *Request, status int, recognition *Recognition) {
+	log.Print(recognition)
+	res := req.NewSuccessResponse(status, recognition)
+	err := wire.Send(res.Message())
+	if err != nil {
+		log.Printf(fmt.Sprintf("Wire.Send(responseMsg), error = %v", err))
+		// when error on wire, ws connection cannot be closed gracefully any more
+		return
+	}
+	wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
 }
 
 func sendErrorResponse(wire *Wire, req *Request, errMsg string) {
@@ -183,7 +197,7 @@ loop_chunk:
 	}
 
 	// new a clip file name here
-
+	var voicePath string = "/mnt/test-%v-%v.wav"
 	log.Printf("frame number %v\n", frameNum)
 events_loop:
 	for e := range detector.Events {
@@ -191,7 +205,10 @@ events_loop:
 		case vad.EventVoiceBegin:
 			// ignore handling
 		case vad.EventVoiceEnd:
-			f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
+			//f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
+			t := time.Now()
+			voicePath = fmt.Sprintf(voicePath, req.CID, t.Format("20060102150405"))
+			f, err := os.Create(voicePath)
 			if err != nil {
 				errMsg = fmt.Sprintf("fail to save clip, fs.Open() error = %v\n", err)
 				log.Print(errMsg)
@@ -215,7 +232,35 @@ events_loop:
 	}
 
 	// todo asr and nlp here
-
+	log.Printf("voice_path: %s\n", voicePath)
+	asrText := util.AsrClient(voicePath)
+	postData := map[string]interface{}{
+		"user_id":  req.CID,
+		"robot_id": "4a44a2992fbaf64d5c19fb1b192f45c8",
+		"input":    asrText,
+		"token":    "21c7d084b200a17c9641c83d4697fde9",
+	}
+	if flowReturn, err := util.FlowUtilSay(postData); err == nil {
+		flowData := flowReturn.(map[string]interface{})
+		recog := Recognition{
+			AnswerText: flowData["slot_output"].(string),
+			AudioText:  asrText,
+			AudioNum:   strings.Replace(flowData["output_command"].(string), "\r\n", "", -1),
+		}
+		var status int
+		if flowData["flow_end"] == true {
+			status = 1
+		} else {
+			status = 0
+		}
+		msg := req.NewSuccessResponse(status, &recog)
+		log.Printf("msg.Message: %s\n", msg.Message())
+		err = wire.Send(msg.Message())
+		if err != nil {
+			log.Fatalf("Wire.Send(requestMsg) error = %v", err)
+		}
+		log.Println(recog)
+	}
 	sendCloseMessage(c, websocket.CloseNormalClosure, "")
 }
 
