@@ -27,7 +27,8 @@ func main() {
 
 	u := url.URL{Scheme: "ws", Host: *addr, Path: "/mrcp"}
 	log.Printf("connecting to %s", u.String())
-	fn := "../../data/8ef79f2695c811ea.wav"
+	// fn := "../../data/8ef79f2695c811ea.wav"
+	fn := "../../data/0ebb1c6895c611ea.wav"
 	log.Printf("detecting %s", fn)
 	app.ClientRequest(u.String(), fn)
 }

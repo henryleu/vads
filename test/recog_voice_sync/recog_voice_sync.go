@@ -1,5 +1,3 @@
-// +build ignore
-
 package main
 
 import (
@@ -14,8 +12,8 @@ import (
 )
 
 func main() {
-	fn := "../data/8ef79f2695c811ea.wav"
-	// fn := "../data/16khz-16bits-5.wav"
+	// fn := "../data/8ef79f2695c811ea.wav"
+	fn := "../data/0ebb1c6895c611ea.wav"
 
 	r, err := wav.NewReaderFromFile(fn)
 	if err != nil {
@@ -32,6 +30,10 @@ func main() {
 	c.NoinputTimeout = 20000
 	c.VADLevel = 3
 
+	log.Printf("config.SampleRate\t\t%v\n", c.SampleRate)
+	log.Printf("config.BytesPerSample\t\t%v\n", c.BytesPerSample)
+	log.Printf("config.FrameDuration\t\t%v\n", c.FrameDuration)
+
 	err = c.Validate()
 	if err != nil {
 		log.Fatalf("Config.Validate() error = %v", err)
@@ -41,7 +43,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Detector.Init() error = %v", err)
 	}
-
+	log.Printf("frame length %v\n", d.BytesPerFrame())
 	frame := make([]byte, d.BytesPerFrame())
 	for {
 		_, err := io.ReadFull(r, frame)
@@ -65,15 +67,14 @@ func main() {
 events_loop:
 	for e := range d.Events {
 		switch e.Type {
-		// case vad.EventVoiceBegin:
-		// 	fmt.Println("voice begin")
-		// 	break
+		case vad.EventVoiceBegin:
+			log.Println("voice begin")
 		case vad.EventVoiceEnd:
 			fmt.Println("voice end")
 			f, err := test.NewFile()
 			e.Clip.SaveToWriter(f)
 			wn := f.Name()
-			fmt.Println("name: ", wn)
+			log.Println("name: ", wn)
 			rf, err := test.OpenFile(wn)
 			if err != nil {
 				log.Fatalf("fs.Open() error = %v", err)
@@ -85,7 +86,7 @@ events_loop:
 			f, err := test.NewFile()
 			e.Clip.SaveToWriter(f)
 			wn := f.Name()
-			fmt.Println("name: ", wn)
+			log.Println("name: ", wn)
 			rf, err := test.OpenFile(wn)
 			if err != nil {
 				log.Fatalf("fs.Open() error = %v", err)
@@ -93,9 +94,8 @@ events_loop:
 			test.PlayWaveFile(rf)
 			break events_loop
 		default:
-			fmt.Printf("illegal event type %v\n", e.Type)
+			log.Printf("illegal event type %v\n", e.Type)
 		}
 	}
-
 	time.Sleep(time.Second * 1)
 }

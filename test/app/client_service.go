@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 
+	"github.com/gorilla/websocket"
 	ws "github.com/gorilla/websocket"
 	wav "github.com/henryleu/vads/wav"
 )
@@ -19,11 +20,15 @@ func ClientRequest(url, fn string) {
 
 	wire := NewWire(c)
 	done := make(chan struct{})
+	var errMsg string
 
 	go wire.ClientReceive()
 
 	go func() {
-		defer close(done)
+		defer func() {
+			close(done)
+			log.Println("done channel is closed")
+		}()
 	loop_response:
 		for {
 			select {
@@ -36,6 +41,7 @@ func ClientRequest(url, fn string) {
 						break loop_response
 					}
 					log.Printf("succeed to get response: %v\n", res)
+					wire.SendCloseMessage(websocket.CloseNormalClosure, "")
 					break loop_response
 				default:
 					log.Printf("client can only receive response msg, but got %v message\n", msg.Type)
@@ -66,7 +72,10 @@ func ClientRequest(url, fn string) {
 
 	r, err := wav.NewReaderFromFile(fn)
 	if err != nil {
-		log.Fatalf("wav.NewReaderFromFile() error = %v", err)
+		errMsg = fmt.Sprintf("wav.NewReaderFromFile() error = %v\n", err)
+		log.Print(errMsg)
+		wire.SendCloseMessage(websocket.CloseUnsupportedData, errMsg)
+		return
 	}
 
 	frame := make([]byte, 1280)
@@ -74,13 +83,20 @@ func ClientRequest(url, fn string) {
 
 send_chunk:
 	for {
+		select {
+		case <-done:
+			break send_chunk
+		default:
+		}
 		_, err := io.ReadFull(r, frame)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			log.Printf("wav file is EOF, error: %v\n", err)
-			break
+			break send_chunk
 		}
 		if err != nil {
-			log.Fatalf("fail to read wav file, error = %v", err)
+			errMsg = fmt.Sprintf("fail to read wav file, error = %v", err)
+			log.Print(errMsg)
+			break send_chunk
 		}
 
 		i++
@@ -90,30 +106,15 @@ send_chunk:
 			Data: frame,
 		}
 		chunk.EncodeAudio()
-		msg := chunk.Message()
-		err = wire.Send(msg)
+		err = wire.Send(chunk.Message())
 		if err != nil {
-			log.Fatalf("Wire.Send(chunkMsg) error = %v", err)
-		}
-		select {
-		case <-done:
-			break send_chunk
-		default:
+			errMsg = fmt.Sprintf("Wire.Send(chunkMsg) error = %v", err)
+			log.Print(errMsg)
+			return
 		}
 		log.Printf("chunk no %v\n", i)
 	}
 
 	log.Println("client is done")
-	closeConn(c)
-}
-
-func closeConn(c *ws.Conn) {
-	// Cleanly close the connection by sending a close message and then
-	// waiting (with timeout) for the server to close the connection.
-	err := c.WriteMessage(ws.CloseMessage, ws.FormatCloseMessage(ws.CloseNormalClosure, "interrupted"))
-	if err != nil {
-		log.Println("write close:", err)
-		return
-	}
-
+	wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
 }

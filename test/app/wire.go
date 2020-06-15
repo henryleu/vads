@@ -125,7 +125,6 @@ func (w *Wire) Send(msg *Message) error {
 		return fmt.Errorf("wire error - fail to write message to wire, error: %v", err)
 	}
 	return wc.Close()
-	// return nil
 }
 
 // SendCloseMessage sends close message for closing connection gracefully

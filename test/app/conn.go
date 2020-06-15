@@ -2,7 +2,6 @@ package app
 
 import (
 	"io"
-	"log"
 
 	ws "github.com/gorilla/websocket"
 )
@@ -24,12 +23,11 @@ func (c *Conn) ensureReader() error {
 	if c.r != nil {
 		return nil
 	}
-	t, r, err := c.Conn.NextReader()
-	if t != ws.BinaryMessage && t != ws.TextMessage {
-		log.Printf("conn - ws conn got unwanted reader type: %v\n", t)
-	}
+	_, r, err := c.Conn.NextReader()
+	// if t != ws.BinaryMessage && t != ws.TextMessage {
+	// 	log.Printf("conn - ws conn got unwanted reader type: %v\n", t)
+	// }
 	if err != nil {
-		log.Printf("conn - NextReader(), err: %v\n", err)
 		return err
 	}
 	c.r = r

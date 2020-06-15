@@ -51,6 +51,7 @@ func (c *Clip) SaveToWriter(wc io.WriteCloser) error {
 	log.Printf("Clip BytesPerSample:\t%v\n", c.BytesPerSample)
 	log.Printf("Clip Start:\t%v\n", c.Start)
 	log.Printf("Clip Duration:\t%v\n", c.Duration)
+	log.Printf("Clip Data Size:\t%v\n", len(c.Data))
 
 	w, err := wav.NewWriter(param)
 	defer w.Close()

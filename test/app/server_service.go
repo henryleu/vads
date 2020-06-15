@@ -43,14 +43,16 @@ func getConfig() *vad.Config {
 }
 
 func sendCloseMessage(c *websocket.Conn, code int, msg string) {
-	c.SetWriteDeadline(time.Now().Add(writeWait))
-	c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, msg))
-	// c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if code != websocket.CloseNormalClosure {
+		c.SetWriteDeadline(time.Now().Add(writeWait))
+		c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, msg))
+		// c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	}
 	time.Sleep(closeGracePeriod)
 }
 
 func sendErrorResponse(wire *Wire, req *Request, errMsg string) {
-	log.Printf(errMsg)
+	log.Print(errMsg)
 	res := req.NewErrorResponse(errMsg)
 	err := wire.Send(res.Message())
 	if err != nil {
@@ -65,7 +67,7 @@ func sendErrorResponse(wire *Wire, req *Request, errMsg string) {
 func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Print("upgrade:", err)
+		log.Println("upgrade:", err)
 		return
 	}
 	defer c.Close()
@@ -73,10 +75,7 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	wire := NewWire(c)
 	go wire.ServerReceive()
 
-	responseError := func(errMsg string) {
-		// todo
-	}
-
+	log.Printf("frame length %v\n", frameLen)
 	var req *Request
 	var errMsg string
 	select {
@@ -92,8 +91,8 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errMsg != "" {
-		log.Printf(errMsg)
-		responseError(errMsg)
+		log.Print(errMsg)
+		wire.SendCloseMessage(websocket.CloseUnsupportedData, errMsg)
 		return
 	}
 
@@ -104,13 +103,14 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	detector.FrameDuration = frameDuration
 	err = detector.Init()
 	if err != nil {
-		log.Printf("Detector.Init() error = %v", err)
-		// this is a vital configuration error in development-time,
-		// so the handle func should return without closing ws connection
+		errMsg = fmt.Sprintf("Detector.Init() error = %v", err)
+		log.Print(errMsg)
+		wire.SendCloseMessage(websocket.CloseUnsupportedData, errMsg)
 		return
 	}
 
 	chunkNo := 0
+	frameNum := 0
 loop_chunk:
 	for {
 		select {
@@ -144,6 +144,7 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail to validate chunk data, the size is %d\n", chunkSize)
 				break loop_chunk
 			}
+			log.Printf("chunk no %v\n", chunk.NO)
 
 			// process chunks
 			data := chunk.Data
@@ -156,15 +157,15 @@ loop_chunk:
 				frame = data[:frameLen] // a slice with 320 bytes
 				data = data[frameLen:]
 				err := detector.Process(frame)
-				detector.Process(frame)
 				if !detector.Working() {
-					log.Printf("detector is stopped for session [%v] after %v chunks\n", chunk.NO, chunk.CID)
+					log.Printf("detector is stopped for session [%v] after %v chunks\n", chunk.CID, chunk.NO)
 					break loop_chunk
 				}
 				if err != nil {
 					errMsg = fmt.Sprintf("fail to process frame in chunk NO[%v] of session[%v], error = %v\n", chunk.NO, chunk.CID, err)
 					break loop_chunk
 				}
+				frameNum++
 			} // end loop frame
 			// go on looping more chunks
 		case err = <-wire.ErrCh:
@@ -182,13 +183,14 @@ loop_chunk:
 		return
 	}
 
+	log.Printf("frame number %v\n", frameNum)
 events_loop:
 	for e := range detector.Events {
 		switch e.Type {
 		case vad.EventVoiceBegin:
 			// ignore handling
 		case vad.EventVoiceEnd:
-			f, err := ioutil.TempFile("", fmt.Sprintf("%v-*.wav", req.CID))
+			f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
 			if err != nil {
 				errMsg = fmt.Sprintf("fail to save clip, fs.Open() error = %v\n", err)
 				log.Print(errMsg)
@@ -201,7 +203,7 @@ events_loop:
 			errMsg = fmt.Sprintf("fail to detect noinput speech for session %v\n", req.CID)
 			break events_loop
 		default:
-			fmt.Printf("illegal event type %v\n", e.Type)
+			log.Printf("illegal event type %v\n", e.Type)
 		}
 	}
 
