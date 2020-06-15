@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/henryleu/vads/test/app"
+	"github.com/henryleu/vads/hly"
 )
 
 var addr = flag.String("addr", "localhost:6000", "http service address")
@@ -27,8 +27,8 @@ func main() {
 		}
 	}()
 
-	http.HandleFunc("/mrcp", app.HandleMRCP)
-	http.HandleFunc("/", app.Home)
+	http.HandleFunc("/mrcp", hly.HandleMRCP)
+	http.HandleFunc("/", hly.Home)
 	log.Printf("server is listening on %v\n", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }

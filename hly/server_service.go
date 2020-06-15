@@ -1,4 +1,4 @@
-package app
+package hly
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ const chunkTimeout = time.Second * 5
 const minFrameSize = 160 // 8000/1000*2*10
 const sampleRate = 8000
 const bytesPerSample = 2
-const frameDuration = 20
+const frameDuration = 20 // 20ms 10 20 30
 const frameLen = frameDuration * 16
 
 // mock to load config from file on boot
@@ -46,7 +46,6 @@ func sendCloseMessage(c *websocket.Conn, code int, msg string) {
 	if code != websocket.CloseNormalClosure {
 		c.SetWriteDeadline(time.Now().Add(writeWait))
 		c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, msg))
-		// c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	}
 	time.Sleep(closeGracePeriod)
 }
@@ -182,6 +181,8 @@ loop_chunk:
 		sendErrorResponse(wire, req, errMsg)
 		return
 	}
+
+	// new a clip file name here
 
 	log.Printf("frame number %v\n", frameNum)
 events_loop:

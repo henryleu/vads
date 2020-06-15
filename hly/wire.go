@@ -1,4 +1,4 @@
-package app
+package hly
 
 import (
 	"bufio"
@@ -17,7 +17,7 @@ const debugMessage = false
 const writeWait = 10 * time.Second
 
 // Time to wait before force close on connection.
-const closeGracePeriod = 10 * time.Second
+const closeGracePeriod = 2 * time.Second
 
 // Wire wraps
 type Wire struct {
