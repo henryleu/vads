@@ -1,5 +1,7 @@
 package app
 
+import "encoding/base64"
+
 /*
 	基本信息
 	Port:6000
@@ -40,6 +42,32 @@ type Request struct {
 	Business *Business `json:"business"`
 }
 
+// Message creates a request Message
+func (o *Request) Message() *Message {
+	return &Message{
+		Type:    RequestType,
+		Payload: o,
+	}
+}
+
+// NewErrorResponse creates and returns a new response with error result
+func (o *Request) NewErrorResponse(detail string) *Response {
+	return &Response{
+		CID: o.CID,
+		Result: &Result{
+			Code:   0, //处理结果 1：成功; 0：失败;
+			Detail: detail,
+			Return: &Return{
+				Control: &Control{
+					// 挂机处置方式：0：继续对话；1：结束对话；
+					Status: 1,
+				},
+				Recognition: &Recognition{},
+			},
+		},
+	}
+}
+
 // Business is the biz info in the inbound session message
 type Business struct {
 	UID      string `json:"uid"`
@@ -72,6 +100,29 @@ type Chunk struct {
 	NO    string `json:"chunk"`
 	Audio string `json:"audio"`
 	Data  []byte `json:"-"`
+}
+
+// EncodeAudio encodes audio bytes to base64 string
+func (o *Chunk) EncodeAudio() {
+	o.Audio = base64.StdEncoding.EncodeToString(o.Data)
+}
+
+// DecodeAudio decodes audio base64 string back to bytes
+func (o *Chunk) DecodeAudio() error {
+	data, err := base64.StdEncoding.DecodeString(o.Audio)
+	if err != nil {
+		return err
+	}
+	o.Data = data
+	return nil
+}
+
+// Message creates a chunk Message
+func (o *Chunk) Message() *Message {
+	return &Message{
+		Type:    ChunkType,
+		Payload: o,
+	}
 }
 
 /*
@@ -114,9 +165,17 @@ type Response struct {
 	Result *Result `json:"result"`
 }
 
+// Message creates a response Message
+func (o *Response) Message() *Message {
+	return &Message{
+		Type:    ResponseType,
+		Payload: o,
+	}
+}
+
 // Result descries the result infos of the response
 type Result struct {
-	Code   string  `json:"cid"`
+	Code   int     `json:"cid"`
 	Detail string  `json:"rate"`
 	Return *Return `json:"return"`
 }

@@ -92,9 +92,9 @@ const (
 
 // DefaultConfig is
 var defaultConfig = Config{
-	SpeechTimeout:      300,
-	SilenceTimeout:     300,
-	NoinputTimeout:     5000,
+	SpeechTimeout:      800,
+	SilenceTimeout:     800,
+	NoinputTimeout:     10000,
 	NoinputTimers:      true,
 	RecognitionTimeout: 20000,
 	RecognitionTimers:  true,

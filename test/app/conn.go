@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"io"
 	"log"
 
@@ -26,10 +25,11 @@ func (c *Conn) ensureReader() error {
 		return nil
 	}
 	t, r, err := c.Conn.NextReader()
-	if t != ws.BinaryMessage {
+	if t != ws.BinaryMessage && t != ws.TextMessage {
 		log.Printf("conn - ws conn got unwanted reader type: %v\n", t)
 	}
 	if err != nil {
+		log.Printf("conn - NextReader(), err: %v\n", err)
 		return err
 	}
 	c.r = r
@@ -43,28 +43,9 @@ func (c *Conn) Read(b []byte) (int, error) {
 	}
 
 	n, err := c.r.Read(b)
-	if err == io.EOF || err == ErrUnexpectedEOF
-
-	if c.r == nil {0
-		t, r, err := c.Conn.NextReader()
-		if t != ws.BinaryMessage {
-			log.Printf("ws reader type is %v\n", t)
-		}
-		if err != nil {
-			return 0, err
-		}
+	if err != nil || n == 0 {
+		c.r = nil
+		return c.Read(b)
 	}
-
-	wc, err := w.Conn.NextWriter(ws.BinaryMessage)
-	if err != nil {
-		return fmt.Errorf("Conn error - fail to write message to Conn, error: %v", err)
-	}
-
-	if _, err = wc.Write(ConnBytes); err != nil {
-		return fmt.Errorf("Conn error - fail to write message to Conn, error: %v", err)
-	}
-	if debugMessage {
-		log.Printf("message sent ->\n%v", string(ConnBytes))
-	}
-	return wc.Close()
+	return n, nil
 }

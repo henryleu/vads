@@ -3,60 +3,51 @@ package app
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
+	"time"
 
+	"github.com/gorilla/websocket"
 	ws "github.com/gorilla/websocket"
 )
 
-var debugMessage = true
+const debugMessage = false
+
+// Time allowed to write a message to the peer.
+const writeWait = 10 * time.Second
+
+// Time to wait before force close on connection.
+const closeGracePeriod = 10 * time.Second
 
 // Wire wraps
 type Wire struct {
-	Conn  *ws.Conn
 	MsgCh chan Message
 	ErrCh chan error
+	conn  *ws.Conn
+	r     io.Reader
 }
 
 // NewWire creates wire between game server and team client.
 func NewWire(conn *ws.Conn) *Wire {
 	return &Wire{
-		Conn:  conn,
 		MsgCh: make(chan Message, 2),
 		ErrCh: make(chan error, 10),
+		conn:  conn,
+		r:     NewConn(conn),
 	}
-}
-
-// Send sends message to the wire
-func (w *Wire) Send(msg *Message) error {
-	wireBytes, err := msg.BytesOnWire()
-	if err != nil {
-		return err
-	}
-
-	wc, err := w.Conn.NextWriter(ws.BinaryMessage)
-	if err != nil {
-		return fmt.Errorf("wire error - fail to write message to wire, error: %v", err)
-	}
-
-	if _, err = wc.Write(wireBytes); err != nil {
-		return fmt.Errorf("wire error - fail to write message to wire, error: %v", err)
-	}
-	if debugMessage {
-		log.Printf("message sent ->\n%v", string(wireBytes))
-	}
-	return wc.Close()
 }
 
 // ClientReceive acts as a client to receive message from server on the wire
 func (w *Wire) ClientReceive() {
-	scanner := bufio.NewScanner(w.Reader)
+	scanner := bufio.NewScanner(w.r)
 	scanner.Split(msgSplit)
 	for scanner.Scan() {
+		bytes := scanner.Bytes()
 		if debugMessage {
-			log.Printf("message received ->\n%v", string(scanner.Bytes()))
+			log.Printf("message received ->\n%v", string(bytes))
 		}
 
-		msg, err := ParseResponseOnWire(scanner.Bytes())
+		msg, err := ParseResponseOnWire(bytes)
 		if err == nil {
 			w.MsgCh <- *msg
 			continue
@@ -68,25 +59,30 @@ func (w *Wire) ClientReceive() {
 
 // ServerReceive acts as a server to receive message from client on the wire
 func (w *Wire) ServerReceive() {
-	scanner := bufio.NewScanner(w.Reader)
+	scanner := bufio.NewScanner(w.r)
 	scanner.Split(msgSplit)
+	first := true
 	for scanner.Scan() {
+		bytes := scanner.Bytes()
 		if debugMessage {
-			log.Printf("message received ->\n%v", string(scanner.Bytes()))
+			log.Printf("message received ->\n%v", string(bytes))
 		}
-		msg, err := ParseChunkOnWire(scanner.Bytes())
-		if err == nil {
-			w.MsgCh <- *msg
-			continue
+		if first {
+			first = false
+			msg, err := ParseRequestOnWire(bytes)
+			if err == nil {
+				w.MsgCh <- *msg
+				continue
+			}
+			w.ErrCh <- err
+		} else {
+			msg, err := ParseChunkOnWire(bytes)
+			if err == nil {
+				w.MsgCh <- *msg
+				continue
+			}
+			w.ErrCh <- err
 		}
-
-		msg, err = ParseRequestOnWire(scanner.Bytes())
-		if err == nil {
-			w.MsgCh <- *msg
-			continue
-		}
-
-		w.ErrCh <- err
 	}
 }
 
@@ -108,4 +104,33 @@ func msgSplit(data []byte, atEOF bool) (int, []byte, error) {
 	msgBytes := make([]byte, totalSize, totalSize)
 	copy(msgBytes, data[:totalSize])
 	return totalSize, msgBytes, nil
+}
+
+// Send sends message to the wire
+func (w *Wire) Send(msg *Message) error {
+	wireBytes, err := msg.BytesOnWire()
+	if debugMessage {
+		log.Printf("message sent ->\n%v", string(wireBytes))
+	}
+	if err != nil {
+		return err
+	}
+
+	wc, err := w.conn.NextWriter(ws.BinaryMessage)
+	if err != nil {
+		return fmt.Errorf("wire error - fail to write message to wire, error: %v", err)
+	}
+
+	if _, err = wc.Write(wireBytes); err != nil {
+		return fmt.Errorf("wire error - fail to write message to wire, error: %v", err)
+	}
+	return wc.Close()
+	// return nil
+}
+
+// SendCloseMessage sends close message for closing connection gracefully
+func (w *Wire) SendCloseMessage(code int, msg string) {
+	w.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	w.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, msg))
+	time.Sleep(closeGracePeriod)
 }
