@@ -2,14 +2,16 @@ package hly
 
 import (
 	"io"
+	"log"
 
 	ws "github.com/gorilla/websocket"
 )
 
 // Conn wraps a net.Conn like Conn
 type Conn struct {
-	Conn *ws.Conn
-	r    io.Reader
+	Conn  *ws.Conn
+	r     io.Reader
+	index int
 }
 
 // NewConn creates Conn between game server and team client.
@@ -30,6 +32,8 @@ func (c *Conn) ensureReader() error {
 	if err != nil {
 		return err
 	}
+	c.index++
+	log.Printf("nextReader %v\n", c.index)
 	c.r = r
 	return nil
 }
