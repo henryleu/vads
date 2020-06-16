@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -83,7 +82,12 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 		log.Println("upgrade:", err)
 		return
 	}
-	defer c.Close()
+	//defer c.Close()
+
+	defer func() {
+		c.Close()
+		log.Println("server conn is closed")
+	}()
 
 	wire := NewWire(c)
 	go wire.ServerReceive()
@@ -94,11 +98,12 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	select {
 	case msg := <-wire.MsgCh:
 		req, err = msg.Request()
+		log.Println("001 msg :%v\n", req.Message())
 		if err != nil {
-			errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
+			errMsg = fmt.Sprintf("001 fail to get request msg, error = %v\n", err)
 		}
 	case err = <-wire.ErrCh:
-		errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
+		errMsg = fmt.Sprintf("002 fail to get request msg, error = %v\n", err)
 	case <-time.After(requestTimeout):
 		errMsg = "fail to get request msg, error = timeout\n"
 	}
@@ -142,11 +147,12 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
-			cno, err := strconv.Atoi(chunk.NO)
-			if err != nil {
-				errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
-				break loop_chunk
-			}
+			cno := chunk.NO
+			//cno, err := strconv.Atoi(chunk.NO)
+			//if err != nil {
+			//	errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
+			//	break loop_chunk
+			//}
 			chunkNo++
 			if chunkNo != cno {
 				errMsg = fmt.Sprintf("fail to validate chunk no, want %d, got %d\n", chunkNo, cno)
@@ -259,7 +265,6 @@ events_loop:
 		if err != nil {
 			log.Fatalf("Wire.Send(requestMsg) error = %v", err)
 		}
-		log.Println(recog)
 	}
 	sendCloseMessage(c, websocket.CloseNormalClosure, "")
 }

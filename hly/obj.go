@@ -115,7 +115,7 @@ type Business struct {
 // Chunk is the chunk data of the inbound voice in the session
 type Chunk struct {
 	CID   string `json:"cid"`
-	NO    string `json:"chunk"`
+	NO    int    `json:"chunk"`
 	Audio string `json:"audio"`
 	Data  []byte `json:"-"`
 }

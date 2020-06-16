@@ -26,7 +26,7 @@ func main() {
 		}
 	}()
 
-	http.HandleFunc("/mrcp", hly.HandleMRCP)
+	http.HandleFunc("/websocket/hly/calling", hly.HandleMRCP)
 	http.HandleFunc("/", hly.Home)
 	log.Printf("server is listening on %v\n", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))

@@ -16,7 +16,12 @@ func ClientRequest(url, fn string) {
 	if err != nil {
 		log.Fatal("dial:", err)
 	}
-	defer c.Close()
+	//defer c.Close()
+
+	defer func() {
+		c.Close()
+		log.Println("client conn is closed")
+	}()
 
 	wire := NewWire(c)
 	done := make(chan struct{})
@@ -101,8 +106,9 @@ send_chunk:
 
 		i++
 		chunk := &Chunk{
-			CID:  req.CID,
-			NO:   fmt.Sprintf("%d", i),
+			CID: req.CID,
+			//NO:   fmt.Sprintf("%d", i),
+			NO:   i,
 			Data: frame,
 		}
 		chunk.EncodeAudio()
@@ -116,5 +122,5 @@ send_chunk:
 	}
 
 	log.Println("client is done")
-	wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
+	//wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
 }

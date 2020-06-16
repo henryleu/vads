@@ -11,7 +11,7 @@ import (
 	ws "github.com/gorilla/websocket"
 )
 
-const debugMessage = false
+const debugMessage = true
 
 // Time allowed to write a message to the peer.
 const writeWait = 10 * time.Second
@@ -70,6 +70,7 @@ func (w *Wire) ServerReceive() {
 		if first {
 			first = false
 			msg, err := ParseRequestOnWire(bytes)
+			log.Printf("ServerReceive first:%s", msg)
 			if err == nil {
 				w.MsgCh <- *msg
 				continue
@@ -77,6 +78,7 @@ func (w *Wire) ServerReceive() {
 			w.ErrCh <- err
 		} else {
 			msg, err := ParseChunkOnWire(bytes)
+			log.Printf("ServerReceive second:%s", msg)
 			if err == nil {
 				w.MsgCh <- *msg
 				continue
