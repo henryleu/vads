@@ -108,8 +108,7 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chunkNo := 0
-	frameNum := 0
+	chunkNo := 1
 loop_chunk:
 	for {
 		select {
@@ -143,7 +142,6 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail to validate chunk data, the size is %d\n", chunkSize)
 				break loop_chunk
 			}
-			log.Printf("chunk no %v\n", chunk.NO)
 
 			// process chunks
 			data := chunk.Data
@@ -164,7 +162,6 @@ loop_chunk:
 					errMsg = fmt.Sprintf("fail to process frame in chunk NO[%v] of session[%v], error = %v\n", chunk.NO, chunk.CID, err)
 					break loop_chunk
 				}
-				frameNum++
 			} // end loop frame
 			// go on looping more chunks
 		case err = <-wire.ErrCh:
@@ -184,7 +181,6 @@ loop_chunk:
 
 	// new a clip file name here
 
-	log.Printf("frame number %v\n", frameNum)
 events_loop:
 	for e := range detector.Events {
 		switch e.Type {

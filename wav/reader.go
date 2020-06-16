@@ -105,7 +105,7 @@ func (rd *Reader) parseRiffChunk() error {
 	if err := binary.Read(rd.input, binary.LittleEndian, chunkSize); err != nil {
 		return err
 	}
-	fmt.Printf("%d  %d\n", chunkSize.ChunkSize+8, rd.size)
+	// fmt.Printf("%d  %d\n", chunkSize.ChunkSize+8, rd.size)
 	// if chunkSize.ChunkSize+8 != uint32(rd.size) {
 	// 	//		fmt.Println("======================")
 	// 	//		fmt.Println("riff chunk size ", rd.riffChunk.ChunkSize)

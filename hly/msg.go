@@ -1,31 +1,9 @@
 package hly
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 )
-
-// MaxJSONLen is the max length of the JSON bytes of a message
-const MaxJSONLen = 60000
-
-// MsgHeadLen is the length of the message header on wire
-const MsgHeadLen = 2
-
-// MsgLen defines message length
-type MsgLen int
-
-// Bytes converts message length to network order bytes
-func (m MsgLen) Bytes() []byte {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint16(buf, uint16(m))
-	return buf[:2]
-}
-
-// ParseMsgLen parses bytes to message length
-func ParseMsgLen(buf []byte) MsgLen {
-	return MsgLen(binary.BigEndian.Uint16(buf))
-}
 
 const (
 	// RequestType defines the type of request message
@@ -50,8 +28,7 @@ type Payload interface{}
 // ParseRequestOnWire parsea bytes on wire to request
 func ParseRequestOnWire(bytes []byte) (*Message, error) {
 	var req Request
-	buf := bytes[MsgHeadLen:]
-	err := json.Unmarshal(buf, &req)
+	err := json.Unmarshal(bytes, &req)
 	if err == nil {
 		return &Message{
 			Type:    RequestType,
@@ -59,56 +36,41 @@ func ParseRequestOnWire(bytes []byte) (*Message, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("message error - fail to unmarshal bytes to request, error: %v\n%v", err, string(buf))
+	return nil, fmt.Errorf("message error - fail to unmarshal bytes to request, error: %v\n%v", err, string(bytes))
 }
 
 // ParseChunkOnWire parsea bytes on wire to request
 func ParseChunkOnWire(bytes []byte) (*Message, error) {
 	var chk Chunk
-	buf := bytes[MsgHeadLen:]
-	err := json.Unmarshal(buf, &chk)
+	err := json.Unmarshal(bytes, &chk)
 	if err == nil {
 		return &Message{
 			Type:    ChunkType,
 			Payload: &chk,
 		}, nil
 	}
-	return nil, fmt.Errorf("message error - fail to unmarshal bytes to chunk, error: %v\n%v", err, string(buf))
+	return nil, fmt.Errorf("message error - fail to unmarshal bytes to chunk, error: %v\n%v", err, string(bytes))
 }
 
 // ParseResponseOnWire parsea bytes on wire to response
 func ParseResponseOnWire(bytes []byte) (*Message, error) {
 	var res Response
-	buf := bytes[MsgHeadLen:]
-	err := json.Unmarshal(buf, &res)
+	err := json.Unmarshal(bytes, &res)
 	if err == nil {
 		return &Message{
 			Type:    ResponseType,
 			Payload: &res,
 		}, nil
 	}
-	return nil, fmt.Errorf("message error - fail to unmarshal bytes to response, error: %v\n%v", err, string(buf))
+	return nil, fmt.Errorf("message error - fail to unmarshal bytes to response, error: %v\n%v", err, string(bytes))
 }
 
 // BytesOnWire returns the bytes of the messsage on the wire.
 func (m *Message) BytesOnWire() ([]byte, error) {
-	jsonBytes, err := json.Marshal(m)
+	bytes, err := json.Marshal(m)
 	if err != nil {
 		return nil, fmt.Errorf("message error - fail to marshal message to bytes, error: %v", err)
 	}
-
-	jsonLen := len(jsonBytes)
-	if jsonLen > MaxJSONLen {
-		return nil, fmt.Errorf("message error - message length %v is greather than %v", jsonLen, MaxJSONLen)
-	}
-
-	bytes := make([]byte, 0, jsonLen+2)
-	lenBytes := MsgLen(jsonLen).Bytes()
-	// log.Printf("message length: %v\n", jsonLen)
-	// log.Printf("message length bytes: %v\n", lenBytes)
-	bytes = append(bytes, lenBytes...)
-	bytes = append(bytes, jsonBytes...)
-	// log.Println("bytes on wire -> \n" + string(bytes))
 	return bytes, nil
 }
 
