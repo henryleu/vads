@@ -2,15 +2,15 @@ package hly
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
-	vad "github.com/henryleu/vads/vad"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"strings"
+	"strconv"
 	"text/template"
 	"time"
-	"vads/hly/util"
+
+	"github.com/gorilla/websocket"
+	vad "github.com/henryleu/vads/vad"
 )
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -147,12 +147,11 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
-			cno := chunk.NO
-			//cno, err := strconv.Atoi(chunk.NO)
-			//if err != nil {
-			//	errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
-			//	break loop_chunk
-			//}
+			cno, err := strconv.Atoi(chunk.NO)
+			if err != nil {
+				errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
+				break loop_chunk
+			}
 			chunkNo++
 			if chunkNo != cno {
 				errMsg = fmt.Sprintf("fail to validate chunk no, want %d, got %d\n", chunkNo, cno)

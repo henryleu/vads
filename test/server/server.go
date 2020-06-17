@@ -20,7 +20,7 @@ func main() {
 		for {
 			select {
 			case <-interrupt:
-				log.Println("server is interrupted")
+				log.Println("process is interrupted")
 				os.Exit(0)
 			}
 		}

@@ -84,7 +84,7 @@ func ClientRequest(url, fn string) {
 	}
 
 	frame := make([]byte, 1280)
-	i := 0
+	i := 1
 
 send_chunk:
 	for {
@@ -118,7 +118,6 @@ send_chunk:
 			log.Print(errMsg)
 			return
 		}
-		log.Printf("chunk no %v\n", i)
 	}
 
 	log.Println("client is done")
