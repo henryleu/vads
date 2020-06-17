@@ -2,15 +2,15 @@ package hly
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"strconv"
-	"text/template"
-	"time"
-
 	"github.com/gorilla/websocket"
 	vad "github.com/henryleu/vads/vad"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"text/template"
+	"time"
+	"vads/hly/util"
 )
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -50,19 +50,6 @@ func sendCloseMessage(c *websocket.Conn, code int, msg string) {
 	time.Sleep(closeGracePeriod)
 }
 
-// return success response-message
-func sendResponseMessage(wire *Wire, req *Request, status int, recognition *Recognition) {
-	log.Print(recognition)
-	res := req.NewSuccessResponse(status, recognition)
-	err := wire.Send(res.Message())
-	if err != nil {
-		log.Printf(fmt.Sprintf("Wire.Send(responseMsg), error = %v", err))
-		// when error on wire, ws connection cannot be closed gracefully any more
-		return
-	}
-	wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
-}
-
 func sendErrorResponse(wire *Wire, req *Request, errMsg string) {
 	log.Print(errMsg)
 	res := req.NewErrorResponse(errMsg)
@@ -82,12 +69,7 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 		log.Println("upgrade:", err)
 		return
 	}
-	//defer c.Close()
-
-	defer func() {
-		c.Close()
-		log.Println("server conn is closed")
-	}()
+	defer c.Close()
 
 	wire := NewWire(c)
 	go wire.ServerReceive()
@@ -98,12 +80,11 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	select {
 	case msg := <-wire.MsgCh:
 		req, err = msg.Request()
-		log.Println("001 msg :%v\n", req.Message())
 		if err != nil {
-			errMsg = fmt.Sprintf("001 fail to get request msg, error = %v\n", err)
+			errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
 		}
 	case err = <-wire.ErrCh:
-		errMsg = fmt.Sprintf("002 fail to get request msg, error = %v\n", err)
+		errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
 	case <-time.After(requestTimeout):
 		errMsg = "fail to get request msg, error = timeout\n"
 	}
@@ -128,7 +109,6 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chunkNo := 0
-	frameNum := 0
 loop_chunk:
 	for {
 		select {
@@ -147,11 +127,12 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
-			cno, err := strconv.Atoi(chunk.NO)
-			if err != nil {
-				errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
-				break loop_chunk
-			}
+			cno := chunk.NO
+			//cno, err := strconv.Atoi(chunk.NO)
+			//if err != nil {
+			//	errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
+			//	break loop_chunk
+			//}
 			chunkNo++
 			if chunkNo != cno {
 				errMsg = fmt.Sprintf("fail to validate chunk no, want %d, got %d\n", chunkNo, cno)
@@ -162,7 +143,6 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail to validate chunk data, the size is %d\n", chunkSize)
 				break loop_chunk
 			}
-			log.Printf("chunk no %v\n", chunk.NO)
 
 			// process chunks
 			data := chunk.Data
@@ -183,7 +163,6 @@ loop_chunk:
 					errMsg = fmt.Sprintf("fail to process frame in chunk NO[%v] of session[%v], error = %v\n", chunk.NO, chunk.CID, err)
 					break loop_chunk
 				}
-				frameNum++
 			} // end loop frame
 			// go on looping more chunks
 		case err = <-wire.ErrCh:
@@ -203,7 +182,6 @@ loop_chunk:
 
 	// new a clip file name here
 	var voicePath string = "/mnt/test-%v-%v.wav"
-	log.Printf("frame number %v\n", frameNum)
 events_loop:
 	for e := range detector.Events {
 		switch e.Type {
@@ -238,6 +216,7 @@ events_loop:
 
 	// todo asr and nlp here
 	log.Printf("voice_path: %s\n", voicePath)
+
 	asrText := util.AsrClient(voicePath)
 	postData := map[string]interface{}{
 		"user_id":  req.CID,
@@ -247,10 +226,13 @@ events_loop:
 	}
 	if flowReturn, err := util.FlowUtilSay(postData); err == nil {
 		flowData := flowReturn.(map[string]interface{})
+		output_command := strings.Replace(flowData["output_command"].(string), "\r\n", "", -1)
+		arr := strings.Split(output_command, ".")
+		fmt.Print(arr[0])
 		recog := Recognition{
 			AnswerText: flowData["slot_output"].(string),
 			AudioText:  asrText,
-			AudioNum:   strings.Replace(flowData["output_command"].(string), "\r\n", "", -1),
+			AudioNum:   arr[0],
 		}
 		var status int
 		if flowData["flow_end"] == true {
@@ -264,6 +246,9 @@ events_loop:
 		if err != nil {
 			log.Fatalf("Wire.Send(requestMsg) error = %v", err)
 		}
+	} else {
+		sendErrorResponse(wire, req, errMsg)
+		return
 	}
 	sendCloseMessage(c, websocket.CloseNormalClosure, "")
 }
@@ -280,17 +265,14 @@ var homeTemplate = template.Must(template.New("").Parse(`
 <meta charset="utf-8">
 <script>
 window.addEventListener("load", function(evt) {
-
     var output = document.getElementById("output");
     var input = document.getElementById("input");
     var ws;
-
     var print = function(message) {
         var d = document.createElement("div");
         d.textContent = message;
         output.appendChild(d);
     };
-
     document.getElementById("open").onclick = function(evt) {
         if (ws) {
             return false;
@@ -311,7 +293,6 @@ window.addEventListener("load", function(evt) {
         }
         return false;
     };
-
     document.getElementById("send").onclick = function(evt) {
         if (!ws) {
             return false;
@@ -320,7 +301,6 @@ window.addEventListener("load", function(evt) {
         ws.send(input.value);
         return false;
     };
-
     document.getElementById("close").onclick = function(evt) {
         if (!ws) {
             return false;
@@ -328,7 +308,6 @@ window.addEventListener("load", function(evt) {
         ws.close();
         return false;
     };
-
 });
 </script>
 </head>

@@ -10,7 +10,7 @@ import (
 	ws "github.com/gorilla/websocket"
 )
 
-const debugMessage = true
+const debugMessage = false
 
 // Time allowed to write a message to the peer.
 const writeWait = 10 * time.Second
@@ -42,7 +42,7 @@ func (w *Wire) ClientReceive() {
 		_, bytes, err := w.conn.ReadMessage()
 		if err != nil {
 			if debugMessage {
-				log.Println("read:", err)
+				log.Println("client read err :", err)
 			}
 			w.mutex.Lock()
 			w.closed = true
@@ -57,7 +57,6 @@ func (w *Wire) ClientReceive() {
 			w.MsgCh <- *msg
 			continue
 		}
-
 		w.ErrCh <- err
 	}
 }
@@ -69,7 +68,7 @@ func (w *Wire) ServerReceive() {
 		_, bytes, err := w.conn.ReadMessage()
 		if err != nil {
 			if debugMessage {
-				log.Println("read:", err)
+				log.Println("server read err:", err)
 			}
 			w.mutex.Lock()
 			w.closed = true

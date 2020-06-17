@@ -18,10 +18,10 @@ func ClientRequest(url, fn string) {
 	}
 	//defer c.Close()
 
-	defer func() {
-		c.Close()
-		log.Println("client conn is closed")
-	}()
+	//defer func() {
+	//	c.Close()
+	//	log.Println("client conn is closed")
+	//}()
 
 	wire := NewWire(c)
 	done := make(chan struct{})
@@ -84,7 +84,7 @@ func ClientRequest(url, fn string) {
 	}
 
 	frame := make([]byte, 1280)
-	i := 1
+	i := 0
 
 send_chunk:
 	for {
@@ -121,5 +121,5 @@ send_chunk:
 	}
 
 	log.Println("client is done")
-	//wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
+	wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
 }

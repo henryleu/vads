@@ -194,8 +194,8 @@ func (o *Response) Message() *Message {
 // Result descries the result infos of the response
 type Result struct {
 	Code   int     `json:"code"`
-	Detail string  `json:"rate"`
-	Return *Return `json:"return"`
+	Detail string  `json:"detail"`
+	Return *Return `json:"ret"`
 }
 
 // Return descries the return info of the response
