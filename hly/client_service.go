@@ -79,7 +79,7 @@ func ClientRequest(url, fn string) {
 	}
 
 	frame := make([]byte, 1280)
-	i := 1
+	i := 0
 
 send_chunk:
 	for {
@@ -101,8 +101,9 @@ send_chunk:
 
 		i++
 		chunk := &Chunk{
-			CID:  req.CID,
-			NO:   fmt.Sprintf("%d", i),
+			CID: req.CID,
+			NO:  i,
+			//NO:   fmt.Sprintf("%d", i),
 			Data: frame,
 		}
 		chunk.EncodeAudio()

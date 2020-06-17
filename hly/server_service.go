@@ -108,7 +108,7 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chunkNo := 1
+	chunkNo := 0
 loop_chunk:
 	for {
 		select {
@@ -127,11 +127,12 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
-			cno, err := strconv.Atoi(chunk.NO)
-			if err != nil {
-				errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
-				break loop_chunk
-			}
+			//cno, err := strconv.Atoi(chunk.NO)
+			//if err != nil {
+			//	errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
+			//	break loop_chunk
+			//}
+			cno := chunk.NO
 			chunkNo++
 			if chunkNo != cno {
 				errMsg = fmt.Sprintf("fail to validate chunk no, want %d, got %d\n", chunkNo, cno)

@@ -97,7 +97,7 @@ type Business struct {
 // Chunk is the chunk data of the inbound voice in the session
 type Chunk struct {
 	CID   string `json:"cid"`
-	NO    string `json:"chunk"`
+	NO    int    `json:"chunk"`
 	Audio string `json:"audio"`
 	Data  []byte `json:"-"`
 }
@@ -176,8 +176,8 @@ func (o *Response) Message() *Message {
 // Result descries the result infos of the response
 type Result struct {
 	Code   int     `json:"cid"`
-	Detail string  `json:"rate"`
-	Return *Return `json:"return"`
+	Detail string  `json:"detail"`
+	Return *Return `json:"ret"`
 }
 
 // Return descries the return info of the response
