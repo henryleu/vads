@@ -90,12 +90,15 @@ func (w *Wire) ServerReceive() {
 
 func msgSplit(data []byte, atEOF bool) (int, []byte, error) {
 	l := len(data)
+	fmt.Printf("data长度：%v\n", l)
 	if atEOF && l < MsgHeadLen {
 		return 0, nil, fmt.Errorf("message error - message is broken, msg:\n%v", string(data))
 	}
 
 	size := ParseMsgLen(data[:MsgHeadLen])
+	fmt.Printf("size：%v\n", size)
 	totalSize := int(size + MsgHeadLen)
+	fmt.Printf("totalSize：%v\n", totalSize)
 	if totalSize > l {
 		if atEOF {
 			return 0, nil, fmt.Errorf("message error - message is broken, msg:\n%v", string(data))
