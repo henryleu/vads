@@ -3,8 +3,11 @@ package hly
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
-	vad "github.com/henryleu/vads/vad"
+	"vads/vad"
+
+	//vad "github.com/henryleu/vads/vad"
 	"log"
+	//log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"strings"
@@ -28,13 +31,13 @@ const frameLen = frameDuration * 16
 // mock to load config from file on boot
 func getConfig() *vad.Config {
 	c := vad.NewDefaultConfig()
-	c.SilenceTimeout = 800   // 800 is the best value, test it before changing
-	c.SpeechTimeout = 800    // 800 is the best value, test it before changing
-	c.NoinputTimeout = 60000 // nearly ignore noinput case
-	c.RecognitionTimeout = 20000
+	c.SilenceTimeout = 300   // 800 is the best value, test it before changing
+	c.SpeechTimeout = 300    // 800 is the best value, test it before changing
+	c.NoinputTimeout = 20000 // nearly ignore noinput case
+	c.RecognitionTimeout = 10000
 	c.VADLevel = 3     // 3 is the best value, test it before changing
 	c.Multiple = false // recognition mode
-
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	err := c.Validate()
 	if err != nil {
 		log.Fatalf("Config.Validate() error = %v", err)
@@ -181,7 +184,7 @@ loop_chunk:
 	}
 
 	// new a clip file name here
-	var voicePath string = "/mnt/test-%v-%v.wav"
+	var voicePath string = "/mnt/voice/hly-%v-%v.wav"
 events_loop:
 	for e := range detector.Events {
 		switch e.Type {
@@ -190,6 +193,7 @@ events_loop:
 		case vad.EventVoiceEnd:
 			//f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
 			t := time.Now()
+			fmt.Print(req.Business)
 			voicePath = fmt.Sprintf(voicePath, req.CID, t.Format("20060102150405"))
 			f, err := os.Create(voicePath)
 			if err != nil {
@@ -216,7 +220,6 @@ events_loop:
 
 	// todo asr and nlp here
 	log.Printf("voice_path: %s\n", voicePath)
-
 	asrText := util.AsrClient(voicePath)
 	postData := map[string]interface{}{
 		"user_id":  req.CID,
@@ -228,7 +231,6 @@ events_loop:
 		flowData := flowReturn.(map[string]interface{})
 		output_command := strings.Replace(flowData["output_command"].(string), "\r\n", "", -1)
 		arr := strings.Split(output_command, ".")
-		fmt.Print(arr[0])
 		recog := Recognition{
 			AnswerText: flowData["slot_output"].(string),
 			AudioText:  asrText,

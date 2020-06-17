@@ -10,5 +10,6 @@ require (
 	github.com/kirinlabs/HttpRequest v1.0.5
 	github.com/maxhawkins/go-webrtcvad v0.0.0-20160913155855-e9f766234143
 	github.com/muesli/cache2go v0.0.0-20200423001931-a100c5aac93f
+	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/afero v1.2.2
 )
