@@ -2,12 +2,11 @@ package hly
 
 import (
 	"fmt"
+	"github.com/gorilla/websocket"
+	ws "github.com/gorilla/websocket"
 	"log"
 	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
-	ws "github.com/gorilla/websocket"
 )
 
 const debugMessage = false
@@ -83,6 +82,10 @@ func (w *Wire) ServerReceive() {
 			msg, err := ParseRequestOnWire(bytes)
 			if err == nil {
 				w.MsgCh <- *msg
+				//fmt.Print(msg["cid"])
+				//if returnMap, err := util.FlowInfoByNumber(); err == nil {
+				//	fmt.Print(returnMap)
+				//}
 				continue
 			}
 			w.ErrCh <- err

@@ -28,7 +28,7 @@ func main() {
 	u := url.URL{Scheme: "ws", Host: *addr, Path: "/websocket/hly/calling"}
 	log.Printf("connecting to %s", u.String())
 	// fn := "../../data/8ef79f2695c811ea.wav"
-	fn := "/mnt/11.wav"
+	fn := "/mnt/9.wav"
 	log.Printf("detecting %s", fn)
 	hly.ClientRequest(u.String(), fn)
 

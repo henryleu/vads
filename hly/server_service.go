@@ -185,15 +185,21 @@ loop_chunk:
 
 	// new a clip file name here
 	var voicePath string = "/mnt/voice/hly-%v-%v.wav"
+	var infoMsg = make(map[string]interface{})
 events_loop:
 	for e := range detector.Events {
 		switch e.Type {
 		case vad.EventVoiceBegin:
-			// ignore handling
+			// 根据被叫获取当前流程信息以及场景信息
+			postData := map[string]interface{}{
+				"mobile": req.Business.Called,
+			}
+			if flowInfo, err := util.FlowInfoByNumber(postData); err == nil {
+				infoMsg = flowInfo.(map[string]interface{})
+			}
 		case vad.EventVoiceEnd:
 			//f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
 			t := time.Now()
-			fmt.Print(req.Business)
 			voicePath = fmt.Sprintf(voicePath, req.CID, t.Format("20060102150405"))
 			f, err := os.Create(voicePath)
 			if err != nil {
@@ -211,21 +217,19 @@ events_loop:
 			log.Printf("illegal event type %v\n", e.Type)
 		}
 	}
-
 	// check error
 	if errMsg != "" {
 		sendErrorResponse(wire, req, errMsg)
 		return
 	}
-
 	// todo asr and nlp here
-	log.Printf("voice_path: %s\n", voicePath)
 	asrText := util.AsrClient(voicePath)
 	postData := map[string]interface{}{
-		"user_id":  req.CID,
-		"robot_id": "4a44a2992fbaf64d5c19fb1b192f45c8",
-		"input":    asrText,
-		"token":    "21c7d084b200a17c9641c83d4697fde9",
+		"user_id":   req.CID,
+		"token":     infoMsg["flow_token"],
+		"robot_id":  infoMsg["robot_id"],
+		"parameter": infoMsg["parameter"],
+		"input":     asrText,
 	}
 	if flowReturn, err := util.FlowUtilSay(postData); err == nil {
 		flowData := flowReturn.(map[string]interface{})

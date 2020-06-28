@@ -91,6 +91,7 @@ type Business struct {
 	UID      string `json:"uid"`
 	Province string `json:"province"`
 	Channel  string `json:"channel"`
+	Called   string `json:"called"`
 }
 
 /*
@@ -243,8 +244,16 @@ type Recognition struct {
 	parameter			json		机器人扩展信息
 */
 type FlowParam struct {
-	UserId  string `json:"user_id"`
-	RobotId string `json:"robot_id"`
-	Input   string `json:"input"`
-	Token   string `json:"token"`
+	UserId    string     `json:"user_id"`
+	RobotId   string     `json:"robot_id"`
+	Input     string     `json:"input"`
+	Parameter *Parameter `json:"parameter"`
+	Token     string     `json:"token"`
+}
+
+type Parameter struct {
+}
+
+type Client struct {
+	Mobile string `json:"mobile"`
 }

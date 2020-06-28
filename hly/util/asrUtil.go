@@ -51,7 +51,7 @@ func AsrClient(filePath string) (content string) {
 	format := "&format=wav"
 	sampleRate := "&sample_rate=8000"
 	httpUrl := url + appkey + format + sampleRate + ""
-	log.Print(httpUrl)
+	//log.Print(httpUrl)
 	/**
 	 * 获取识别token
 	 */
