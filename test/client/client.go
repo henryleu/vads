@@ -10,7 +10,7 @@ import (
 )
 
 //var addr = flag.String("addr", "114.116.103.13:6000", "http service address")
-var addr = flag.String("addr", "0.0.0.0:6000", "http service address")
+var addr = flag.String("addr", "119.3.225.40:6000", "http service address")
 
 func main() {
 	flag.Parse()

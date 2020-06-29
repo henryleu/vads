@@ -236,7 +236,7 @@ events_loop:
 		output_command := strings.Replace(flowData["output_command"].(string), "\r\n", "", -1)
 		arr := strings.Split(output_command, ".")
 		recog := Recognition{
-			AnswerText: flowData["slot_output"].(string),
+			AnswerText: flowData["user_label"].(string),
 			AudioText:  asrText,
 			AudioNum:   arr[0],
 		}

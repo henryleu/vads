@@ -7,9 +7,13 @@ import (
 	"log"
 )
 
-const FlowSayDoUrl = "http://flowtest.aimango.net:5080/robot/say.do"
-const FlowClosedUrl = "http://flowtest.aimango.net:5080/robot/closed.do"
-const FlowInfoUrl = "http://114.116.103.13:8088/api/hly/flow/get"
+//const FlowSayDoUrl = "http://flowtest.aimango.net:5080/robot/say.do"
+//const FlowClosedUrl = "http://flowtest.aimango.net:5080/robot/closed.do"
+//const FlowInfoUrl = "http://114.116.103.13:8088/api/hly/flow/get"
+
+const FlowSayDoUrl = "http://114.116.238.23/robot/say.do"
+const FlowClosedUrl = "http://114.116.238.23/robot/closed.do"
+const FlowInfoUrl = "http://call-aid.aimango.net/api/hly/flow/get"
 
 //const FlowTokenInfo = "Token 21c7d084b200a17c9641c83d4697fde9"
 //const FlowTokenInfo = "Token 814069ed3a6eadd19c1dad445a8c8115     "
