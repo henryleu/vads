@@ -15,7 +15,12 @@ func ClientRequest(url, fn string) {
 	if err != nil {
 		log.Fatal("dial:", err)
 	}
-	defer c.Close()
+	//defer c.Close()
+
+	//defer func() {
+	//	c.Close()
+	//	log.Println("client conn is closed")
+	//}()
 
 	wire := NewWire(c)
 	done := make(chan struct{})
@@ -60,6 +65,7 @@ func ClientRequest(url, fn string) {
 			UID:      "1331114444 abcd",
 			Province: "beijing",
 			Channel:  "03",
+			Called:   "18322693235",
 		},
 	}
 
@@ -78,7 +84,7 @@ func ClientRequest(url, fn string) {
 	}
 
 	frame := make([]byte, 1280)
-	i := 1
+	i := 0
 
 send_chunk:
 	for {
@@ -100,8 +106,9 @@ send_chunk:
 
 		i++
 		chunk := &Chunk{
-			CID:  req.CID,
-			NO:   fmt.Sprintf("%d", i),
+			CID: req.CID,
+			//NO:   fmt.Sprintf("%d", i),
+			NO:   i,
 			Data: frame,
 		}
 		chunk.EncodeAudio()

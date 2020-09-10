@@ -26,7 +26,7 @@ type Wire struct {
 	mutex  sync.Mutex
 }
 
-// NewWire creates wire between game server and team client.
+// NewWire creates wire between game server-bak and team client.
 func NewWire(conn *ws.Conn) *Wire {
 	return &Wire{
 		MsgCh: make(chan Message, 2),
@@ -35,13 +35,13 @@ func NewWire(conn *ws.Conn) *Wire {
 	}
 }
 
-// ClientReceive acts as a client to receive message from server on the wire
+// ClientReceive acts as a client to receive message from server-bak on the wire
 func (w *Wire) ClientReceive() {
 	for {
 		_, bytes, err := w.conn.ReadMessage()
 		if err != nil {
 			if debugMessage {
-				log.Println("read:", err)
+				log.Println("client read err :", err)
 			}
 			w.mutex.Lock()
 			w.closed = true
@@ -60,14 +60,14 @@ func (w *Wire) ClientReceive() {
 	}
 }
 
-// ServerReceive acts as a server to receive message from client on the wire
+// ServerReceive acts as a server-bak to receive message from client on the wire
 func (w *Wire) ServerReceive() {
 	first := true
 	for {
 		_, bytes, err := w.conn.ReadMessage()
 		if err != nil {
 			if debugMessage {
-				log.Println("read:", err)
+				log.Println("server-bak read err:", err)
 			}
 			w.mutex.Lock()
 			w.closed = true
@@ -82,6 +82,10 @@ func (w *Wire) ServerReceive() {
 			msg, err := ParseRequestOnWire(bytes)
 			if err == nil {
 				w.MsgCh <- *msg
+				//fmt.Print(msg["cid"])
+				//if returnMap, err := util.FlowInfoByNumber(); err == nil {
+				//	fmt.Print(returnMap)
+				//}
 				continue
 			}
 			w.ErrCh <- err

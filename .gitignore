@@ -4,11 +4,12 @@
 *.dll
 *.so
 *.dylib
+*.xml
 
 # Logs
 logs
 *.log
-
+ppppp
 # Test binary, built with `go test -c`
 *.test
 
@@ -23,3 +24,4 @@ logs
 
 # IDE files
 .vscode/
+将删除 .idea/

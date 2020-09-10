@@ -68,11 +68,30 @@ func (o *Request) NewErrorResponse(detail string) *Response {
 	}
 }
 
+// NewResponse creates and returns a new response with error result
+func (o *Request) NewSuccessResponse(status int, recognition *Recognition) *Response {
+	return &Response{
+		CID: o.CID,
+		Result: &Result{
+			Code:   1, //处理结果 1：成功; 0：失败;
+			Detail: "success",
+			Return: &Return{
+				Control: &Control{
+					// 挂机处置方式：0：继续对话；1：结束对话；
+					Status: status,
+				},
+				Recognition: recognition,
+			},
+		},
+	}
+}
+
 // Business is the biz info in the inbound session message
 type Business struct {
 	UID      string `json:"uid"`
 	Province string `json:"province"`
 	Channel  string `json:"channel"`
+	Called   string `json:"called"`
 }
 
 /*
@@ -97,7 +116,7 @@ type Business struct {
 // Chunk is the chunk data of the inbound voice in the session
 type Chunk struct {
 	CID   string `json:"cid"`
-	NO    string `json:"chunk"`
+	NO    int    `json:"chunk"`
 	Audio string `json:"audio"`
 	Data  []byte `json:"-"`
 }
@@ -175,9 +194,9 @@ func (o *Response) Message() *Message {
 
 // Result descries the result infos of the response
 type Result struct {
-	Code   int     `json:"cid"`
-	Detail string  `json:"rate"`
-	Return *Return `json:"return"`
+	Code   int     `json:"code"`
+	Detail string  `json:"detail"`
+	Return *Return `json:"ret"`
 }
 
 // Return descries the return info of the response
@@ -196,4 +215,45 @@ type Recognition struct {
 	AudioText  string `json:"audio_text"`
 	AnswerText string `json:"answer_text"`
 	AudioNum   string `json:"audio_num"`
+}
+
+/**
+	flow 请求数据
+	{
+		"user_id":"ihu0rHkuZV",
+		"robot_id":"690340eeadf7638d8e7a916a6160778d",
+		"input":"1231",
+		"parameter":{
+			"option-dict":{
+				"fa5101658de401d18e2f157de6371b12_-44":"正在开会",
+				"d2f299baa005c3dae83e3b93736bb6ed_-22":"放在前台",
+				"0961779b1a537a1fba781663a408ef6b_-22":"代收点"
+			},
+			"entity-parameter":{
+			}
+		},
+		"token":"f86fcc23404392239bb985a75cf38f57"
+	}
+字段说明
+	字段					类型			说明
+	----------------------------------------
+	user_id				string		连接会话唯一标识
+	robot_id			string		机器人id
+	input				string		asr识别结果
+	token				string		机器人token
+	parameter			json		机器人扩展信息
+*/
+type FlowParam struct {
+	UserId    string     `json:"user_id"`
+	RobotId   string     `json:"robot_id"`
+	Input     string     `json:"input"`
+	Parameter *Parameter `json:"parameter"`
+	Token     string     `json:"token"`
+}
+
+type Parameter struct {
+}
+
+type Client struct {
+	Mobile string `json:"mobile"`
 }
