@@ -31,7 +31,7 @@ const frameLen = frameDuration * 16
 func getConfig() *vad.Config {
 	c := vad.NewDefaultConfig()
 	c.SilenceTimeout = 500   // 800 is the best value, test it before changing
-	c.SpeechTimeout = 300    // 800 is the best value, test it before changing
+	c.SpeechTimeout = 800    // 800 is the best value, test it before changing
 	c.NoinputTimeout = 20000 // nearly ignore noinput case
 	c.RecognitionTimeout = 10000
 	c.VADLevel = 3     // 3 is the best value, test it before changing
