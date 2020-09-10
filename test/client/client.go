@@ -9,8 +9,8 @@ import (
 	"vads/hly"
 )
 
-//var addr = flag.String("addr", "114.116.103.13:6000", "http service address")
-var addr = flag.String("addr", "127.0.0.1:6000", "http service address")
+//var addr = flag.String("addr", "127.0.0.1:6000", "http service address")
+var addr = flag.String("addr", "114.116.110.22:6000", "http service address")
 
 func main() {
 	flag.Parse()

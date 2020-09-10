@@ -30,7 +30,7 @@ const frameLen = frameDuration * 16
 // mock to load config from file on boot
 func getConfig() *vad.Config {
 	c := vad.NewDefaultConfig()
-	c.SilenceTimeout = 300   // 800 is the best value, test it before changing
+	c.SilenceTimeout = 500   // 800 is the best value, test it before changing
 	c.SpeechTimeout = 300    // 800 is the best value, test it before changing
 	c.NoinputTimeout = 20000 // nearly ignore noinput case
 	c.RecognitionTimeout = 10000
@@ -83,12 +83,12 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	case msg := <-wire.MsgCh:
 		req, err = msg.Request()
 		if err != nil {
-			errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
+			errMsg = fmt.Sprintf("fail 001 to get request msg, error = %v\n", err)
 		}
 	case err = <-wire.ErrCh:
 		errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
 	case <-time.After(requestTimeout):
-		errMsg = "fail to get request msg, error = timeout\n"
+		errMsg = "fail 002 to get request msg, error = timeout\n"
 	}
 
 	if errMsg != "" {
@@ -117,16 +117,16 @@ loop_chunk:
 		case msg := <-wire.MsgCh:
 			chunk, err := msg.Chunk()
 			if err != nil {
-				errMsg = fmt.Sprintf("fail to get chunk msg, error = %v\n", err)
+				errMsg = fmt.Sprintf("fail  003 to get chunk msg, error = %v\n", err)
 				break loop_chunk
 			}
 			err = chunk.DecodeAudio()
 			if err != nil {
-				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
+				errMsg = fmt.Sprintf("fail 004 to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
 			if req.CID != chunk.CID {
-				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
+				errMsg = fmt.Sprintf("fail 005 to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
 			cno := chunk.NO
@@ -168,10 +168,10 @@ loop_chunk:
 			} // end loop frame
 			// go on looping more chunks
 		case err = <-wire.ErrCh:
-			errMsg = fmt.Sprintf("fail to get chunk msg, error = %v\n", err)
+			errMsg = fmt.Sprintf("fail 006 to get chunk msg, error = %v\n", err)
 			break loop_chunk
 		case <-time.After(chunkTimeout):
-			errMsg = "fail to get chunk msg, error = timeout\n"
+			errMsg = "fail 007 to get chunk msg, error = timeout\n"
 			break loop_chunk
 		}
 	} // end loop chunk
