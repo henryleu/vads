@@ -1,0 +1,6 @@
+github.com/gorilla/websocket v1.4.2 h1:+/TMaTYc4QFitKJxsQ7Yye35DkWvkdLcvGKqM+x0Ufc=
+github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/henryleu/vads v0.2.0 h1:aI//BjDz3T3UiLsZu5cQucztZcP0bP7roPoV1wajVNc=
+github.com/henryleu/vads v0.2.0/go.mod h1:1BHRPaJZHj2I/arP5bR2kDvSwI1SX0tux6jOQs6AItM=
+github.com/maxhawkins/go-webrtcvad v0.0.0-20160913155855-e9f766234143 h1:+UX9Tamq5NNPy6T/GUtKqmElJZY+JktaD2ZESAeqPh0=
+github.com/maxhawkins/go-webrtcvad v0.0.0-20160913155855-e9f766234143/go.mod h1:YdrZ05xnooeP54y7m+/UvI23O1Td46PjWkLJu1VLObM=

@@ -29,6 +29,8 @@ func main() {
 	log.Printf("connecting to %s", u.String())
 	// fn := "../../data/8ef79f2695c811ea.wav"
 	fn := "../data/0ebb1c6895c611ea.wav"
+	// fn := "../data/tts-01.wav"
+
 	log.Printf("detecting %s", fn)
 	hly.ClientRequest(u.String(), fn)
 }

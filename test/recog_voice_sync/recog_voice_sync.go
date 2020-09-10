@@ -13,7 +13,8 @@ import (
 
 func main() {
 	// fn := "../data/8ef79f2695c811ea.wav"
-	fn := "../data/0ebb1c6895c611ea.wav"
+	// fn := "../data/0ebb1c6895c611ea.wav"
+	fn := "../data/haichao_test_01.wav"
 
 	r, err := wav.NewReaderFromFile(fn)
 	if err != nil {

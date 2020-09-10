@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 
-	"github.com/gorilla/websocket"
 	ws "github.com/gorilla/websocket"
 	wav "github.com/henryleu/vads/wav"
 )
@@ -41,7 +40,7 @@ func ClientRequest(url, fn string) {
 						break loop_response
 					}
 					log.Printf("succeed to get response: %v\n", res)
-					wire.SendCloseMessage(websocket.CloseNormalClosure, "")
+					wire.SendCloseMessage(ws.CloseNormalClosure, "")
 					break loop_response
 				default:
 					log.Printf("client can only receive response msg, but got %v message\n", msg.Type)
@@ -74,7 +73,7 @@ func ClientRequest(url, fn string) {
 	if err != nil {
 		errMsg = fmt.Sprintf("wav.NewReaderFromFile() error = %v\n", err)
 		log.Print(errMsg)
-		wire.SendCloseMessage(websocket.CloseUnsupportedData, errMsg)
+		wire.SendCloseMessage(ws.CloseUnsupportedData, errMsg)
 		return
 	}
 
@@ -115,5 +114,5 @@ send_chunk:
 	}
 
 	log.Println("client is done")
-	wire.SendCloseMessage(websocket.CloseUnsupportedData, "")
+	wire.SendCloseMessage(ws.CloseUnsupportedData, "")
 }

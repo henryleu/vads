@@ -6,11 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	ws "github.com/gorilla/websocket"
 )
 
-const debugMessage = false
+const debugMessage = true
 
 // Time allowed to write a message to the peer.
 const writeWait = 10 * time.Second
@@ -134,6 +133,6 @@ func (w *Wire) SendCloseMessage(code int, msg string) {
 	}
 
 	w.conn.SetWriteDeadline(time.Now().Add(writeWait))
-	w.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, msg))
+	w.conn.WriteMessage(ws.CloseMessage, ws.FormatCloseMessage(code, msg))
 	time.Sleep(closeGracePeriod)
 }
