@@ -9,7 +9,7 @@
 # Logs
 logs
 *.log
-ppppp
+
 # Test binary, built with `go test -c`
 *.test
 
