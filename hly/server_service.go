@@ -3,6 +3,7 @@ package hly
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
+	"vads/hly/util"
 	"vads/vad"
 
 	//vad "github.com/henryleu/vads/vad"
@@ -10,10 +11,8 @@ import (
 	//log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
-	"strings"
 	"text/template"
 	"time"
-	"vads/hly/util"
 )
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -185,18 +184,18 @@ loop_chunk:
 
 	// new a clip file name here
 	var voicePath string = "/mnt/voice/hly-%v-%v.wav"
-	var infoMsg = make(map[string]interface{})
+	//var infoMsg = make(map[string]interface{})
 events_loop:
 	for e := range detector.Events {
 		switch e.Type {
 		case vad.EventVoiceBegin:
 			// 根据被叫获取当前流程信息以及场景信息
-			postData := map[string]interface{}{
-				"mobile": req.Business.Called,
-			}
-			if flowInfo, err := util.FlowInfoByNumber(postData); err == nil {
-				infoMsg = flowInfo.(map[string]interface{})
-			}
+			//postData := map[string]interface{}{
+			//	"mobile": req.Business.Called,
+			//}
+			//if flowInfo, err := util.FlowInfoByNumber(postData); err == nil {
+			//	infoMsg = flowInfo.(map[string]interface{})
+			//}
 		case vad.EventVoiceEnd:
 			//f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
 			t := time.Now()
@@ -223,38 +222,51 @@ events_loop:
 		return
 	}
 	// todo asr and nlp here
+	//asrText := util.AsrClient(voicePath)
+	//postData := map[string]interface{}{
+	//	"user_id":   req.CID,
+	//	"token":     infoMsg["flow_token"],
+	//	"robot_id":  infoMsg["robot_id"],
+	//	"parameter": infoMsg["parameter"],
+	//	"input":     asrText,
+	//}
+	//if flowReturn, err := util.FlowUtilSay(postData); err == nil {
+	//	flowData := flowReturn.(map[string]interface{})
+	//	output_command := strings.Replace(flowData["output_command"].(string), "\r\n", "", -1)
+	//	arr := strings.Split(output_command, ".")
+	//	recog := Recognition{
+	//		AnswerText: flowData["user_label"].(string),
+	//		AudioText:  asrText,
+	//		AudioNum:   arr[0],
+	//	}
+	//	var status int
+	//	if flowData["flow_end"] == true {
+	//		status = 1
+	//	} else {
+	//		status = 0
+	//	}
+	//	msg := req.NewSuccessResponse(status, &recog)
+	//	log.Printf("msg.Message: %s\n", msg.Message())
+	//	err = wire.Send(msg.Message())
+	//	if err != nil {
+	//		log.Fatalf("Wire.Send(requestMsg) error = %v", err)
+	//	}
+	//} else {
+	//	sendErrorResponse(wire, req, errMsg)
+	//	return
+	//}
+	//  todo 返回语音识别结果
 	asrText := util.AsrClient(voicePath)
-	postData := map[string]interface{}{
-		"user_id":   req.CID,
-		"token":     infoMsg["flow_token"],
-		"robot_id":  infoMsg["robot_id"],
-		"parameter": infoMsg["parameter"],
-		"input":     asrText,
+	recog := Recognition{
+		AnswerText: "",
+		AudioText:  asrText,
+		AudioNum:   "",
 	}
-	if flowReturn, err := util.FlowUtilSay(postData); err == nil {
-		flowData := flowReturn.(map[string]interface{})
-		output_command := strings.Replace(flowData["output_command"].(string), "\r\n", "", -1)
-		arr := strings.Split(output_command, ".")
-		recog := Recognition{
-			AnswerText: flowData["user_label"].(string),
-			AudioText:  asrText,
-			AudioNum:   arr[0],
-		}
-		var status int
-		if flowData["flow_end"] == true {
-			status = 1
-		} else {
-			status = 0
-		}
-		msg := req.NewSuccessResponse(status, &recog)
-		log.Printf("msg.Message: %s\n", msg.Message())
-		err = wire.Send(msg.Message())
-		if err != nil {
-			log.Fatalf("Wire.Send(requestMsg) error = %v", err)
-		}
-	} else {
-		sendErrorResponse(wire, req, errMsg)
-		return
+	msg := req.NewSuccessResponse(0, &recog)
+	log.Printf("msg.Message: %s\n", msg.Message())
+	err = wire.Send(msg.Message())
+	if err != nil {
+		log.Fatalf("Wire.Send(requestMsg) error = %v", err)
 	}
 	sendCloseMessage(c, websocket.CloseNormalClosure, "")
 }

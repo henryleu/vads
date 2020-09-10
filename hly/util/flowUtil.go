@@ -94,3 +94,18 @@ func FlowInfoByNumber(paramMap interface{}) (returnMap interface{}, err error) {
 	//fmt.Print(returnMap)
 	return
 }
+
+/**
+asrText := util.AsrClient(voicePath)
+	recog := Recognition{
+		AnswerText: "",
+		AudioText:  asrText,
+		AudioNum:   "",
+	}
+	msg := req.NewSuccessResponse(0, &recog)
+	log.Printf("msg.Message: %s\n", msg.Message())
+	err = wire.Send(msg.Message())
+	if err != nil {
+		log.Fatalf("Wire.Send(requestMsg) error = %v", err)
+	}
+*/

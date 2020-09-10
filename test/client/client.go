@@ -10,7 +10,7 @@ import (
 )
 
 //var addr = flag.String("addr", "114.116.103.13:6000", "http service address")
-var addr = flag.String("addr", "119.3.225.40:6000", "http service address")
+var addr = flag.String("addr", "127.0.0.1:6000", "http service address")
 
 func main() {
 	flag.Parse()
@@ -28,7 +28,7 @@ func main() {
 	u := url.URL{Scheme: "ws", Host: *addr, Path: "/websocket/hly/calling"}
 	log.Printf("connecting to %s", u.String())
 	// fn := "../../data/8ef79f2695c811ea.wav"
-	fn := "/mnt/9.wav"
+	fn := "/mnt/12.wav"
 	log.Printf("detecting %s", fn)
 	hly.ClientRequest(u.String(), fn)
 
