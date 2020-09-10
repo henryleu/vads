@@ -24,4 +24,4 @@ ppppp
 
 # IDE files
 .vscode/
-将删除 .idea/
+.idea/
