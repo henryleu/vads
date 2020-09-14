@@ -349,6 +349,20 @@ func (d *Detector) Process(frame []byte) error {
 	return nil
 }
 
+// Finalize forces to end speech whatever speech ends or not.
+func (d *Detector) Finalize() {
+	if !d.work {
+		return
+	}
+	if d.speechStart != 0 {
+		d.endSpeech(0)
+		d.emitVoiceEnd()
+	} else {
+		d.endNoinput()
+		d.emitNoinput()
+	}
+}
+
 // GetClips forces to end speech and returns all clips
 func (d *Detector) GetClips() []*Clip {
 	if !d.Multiple {

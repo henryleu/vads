@@ -26,8 +26,8 @@ func main() {
 	c.SampleRate = int(r.FmtChunk.Data.SamplesPerSec)
 	c.BytesPerSample = int(r.FmtChunk.Data.BitsPerSamples / 8)
 	// 设置一下参数效果最佳
-	c.SilenceTimeout = 800
-	c.SpeechTimeout = 800
+	c.SilenceTimeout = 200
+	c.SpeechTimeout = 200
 	c.NoinputTimeout = 20000
 	c.VADLevel = 3
 
@@ -50,6 +50,7 @@ func main() {
 		_, err := io.ReadFull(r, frame)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			log.Println("file is EOF")
+			d.Finalize()
 			break
 		}
 		if err != nil {
