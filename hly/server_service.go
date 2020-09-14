@@ -2,15 +2,18 @@ package hly
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"strconv"
-	"text/template"
-	"time"
+	"vads/hly/util"
+	"vads/vad"
 
 	"github.com/gorilla/websocket"
-	vad "github.com/henryleu/vads/vad"
+
+	//vad "github.com/henryleu/vads/vad"
+	"log"
+	//log "github.com/sirupsen/logrus"
+	"net/http"
+	"os"
+	"text/template"
+	"time"
 )
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -28,13 +31,13 @@ const frameLen = frameDuration * 16
 // mock to load config from file on boot
 func getConfig() *vad.Config {
 	c := vad.NewDefaultConfig()
-	c.SilenceTimeout = 800   // 800 is the best value, test it before changing
+	c.SilenceTimeout = 500   // 800 is the best value, test it before changing
 	c.SpeechTimeout = 800    // 800 is the best value, test it before changing
-	c.NoinputTimeout = 60000 // nearly ignore noinput case
-	c.RecognitionTimeout = 20000
+	c.NoinputTimeout = 20000 // nearly ignore noinput case
+	c.RecognitionTimeout = 10000
 	c.VADLevel = 3     // 3 is the best value, test it before changing
 	c.Multiple = false // recognition mode
-
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	err := c.Validate()
 	if err != nil {
 		log.Fatalf("Config.Validate() error = %v", err)
@@ -81,12 +84,12 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 	case msg := <-wire.MsgCh:
 		req, err = msg.Request()
 		if err != nil {
-			errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
+			errMsg = fmt.Sprintf("fail 001 to get request msg, error = %v\n", err)
 		}
 	case err = <-wire.ErrCh:
 		errMsg = fmt.Sprintf("fail to get request msg, error = %v\n", err)
 	case <-time.After(requestTimeout):
-		errMsg = "fail to get request msg, error = timeout\n"
+		errMsg = "fail 002 to get request msg, error = timeout\n"
 	}
 
 	if errMsg != "" {
@@ -115,24 +118,24 @@ loop_chunk:
 		case msg := <-wire.MsgCh:
 			chunk, err := msg.Chunk()
 			if err != nil {
-				errMsg = fmt.Sprintf("fail to get chunk msg, error = %v\n", err)
+				errMsg = fmt.Sprintf("fail  003 to get chunk msg, error = %v\n", err)
 				break loop_chunk
 			}
 			err = chunk.DecodeAudio()
 			if err != nil {
-				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
+				errMsg = fmt.Sprintf("fail 004 to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
 			if req.CID != chunk.CID {
-				errMsg = fmt.Sprintf("fail to decode chunk audio, error = %v\n", err)
+				errMsg = fmt.Sprintf("fail 005 to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
+			cno := chunk.NO
 			//cno, err := strconv.Atoi(chunk.NO)
 			//if err != nil {
 			//	errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
 			//	break loop_chunk
 			//}
-			cno := chunk.NO
 			chunkNo++
 			if chunkNo != cno {
 				errMsg = fmt.Sprintf("fail to validate chunk no, want %d, got %d\n", chunkNo, cno)
@@ -166,10 +169,10 @@ loop_chunk:
 			} // end loop frame
 			// go on looping more chunks
 		case err = <-wire.ErrCh:
-			errMsg = fmt.Sprintf("fail to get chunk msg, error = %v\n", err)
+			errMsg = fmt.Sprintf("fail 006 to get chunk msg, error = %v\n", err)
 			break loop_chunk
 		case <-time.After(chunkTimeout):
-			errMsg = "fail to get chunk msg, error = timeout\n"
+			errMsg = "fail 007 to get chunk msg, error = timeout\n"
 			break loop_chunk
 		}
 	} // end loop chunk
@@ -181,14 +184,24 @@ loop_chunk:
 	}
 
 	// new a clip file name here
-
+	var voicePath string = "/mnt/voice/hly-%v-%v.wav"
+	//var infoMsg = make(map[string]interface{})
 events_loop:
 	for e := range detector.Events {
 		switch e.Type {
 		case vad.EventVoiceBegin:
-			// ignore handling
+			// 根据被叫获取当前流程信息以及场景信息
+			//postData := map[string]interface{}{
+			//	"mobile": req.Business.Called,
+			//}
+			//if flowInfo, err := util.FlowInfoByNumber(postData); err == nil {
+			//	infoMsg = flowInfo.(map[string]interface{})
+			//}
 		case vad.EventVoiceEnd:
-			f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
+			//f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
+			t := time.Now()
+			voicePath = fmt.Sprintf(voicePath, req.CID, t.Format("20060102150405"))
+			f, err := os.Create(voicePath)
 			if err != nil {
 				errMsg = fmt.Sprintf("fail to save clip, fs.Open() error = %v\n", err)
 				log.Print(errMsg)
@@ -204,15 +217,58 @@ events_loop:
 			log.Printf("illegal event type %v\n", e.Type)
 		}
 	}
-
 	// check error
 	if errMsg != "" {
 		sendErrorResponse(wire, req, errMsg)
 		return
 	}
-
 	// todo asr and nlp here
-
+	//asrText := util.AsrClient(voicePath)
+	//postData := map[string]interface{}{
+	//	"user_id":   req.CID,
+	//	"token":     infoMsg["flow_token"],
+	//	"robot_id":  infoMsg["robot_id"],
+	//	"parameter": infoMsg["parameter"],
+	//	"input":     asrText,
+	//}
+	//if flowReturn, err := util.FlowUtilSay(postData); err == nil {
+	//	flowData := flowReturn.(map[string]interface{})
+	//	output_command := strings.Replace(flowData["output_command"].(string), "\r\n", "", -1)
+	//	arr := strings.Split(output_command, ".")
+	//	recog := Recognition{
+	//		AnswerText: flowData["user_label"].(string),
+	//		AudioText:  asrText,
+	//		AudioNum:   arr[0],
+	//	}
+	//	var status int
+	//	if flowData["flow_end"] == true {
+	//		status = 1
+	//	} else {
+	//		status = 0
+	//	}
+	//	msg := req.NewSuccessResponse(status, &recog)
+	//	log.Printf("msg.Message: %s\n", msg.Message())
+	//	err = wire.Send(msg.Message())
+	//	if err != nil {
+	//		log.Fatalf("Wire.Send(requestMsg) error = %v", err)
+	//	}
+	//} else {
+	//	sendErrorResponse(wire, req, errMsg)
+	//	return
+	//}
+	//  todo 返回语音识别结果
+	asrText := util.AsrClient(voicePath)
+	recog := Recognition{
+		AnswerText: "",
+		AudioText:  asrText,
+		AudioNum:   "",
+	}
+	msg := req.NewSuccessResponse(0, &recog)
+	log.Printf("msg.Message: %s\n", msg.Message())
+	err = wire.Send(msg.Message())
+	if err != nil {
+		log.Fatalf("Wire.Send(requestMsg) error = %v", err)
+	}
 	sendCloseMessage(c, websocket.CloseNormalClosure, "")
 }
 
@@ -228,17 +284,14 @@ var homeTemplate = template.Must(template.New("").Parse(`
 <meta charset="utf-8">
 <script>
 window.addEventListener("load", function(evt) {
-
     var output = document.getElementById("output");
     var input = document.getElementById("input");
     var ws;
-
     var print = function(message) {
         var d = document.createElement("div");
         d.textContent = message;
         output.appendChild(d);
     };
-
     document.getElementById("open").onclick = function(evt) {
         if (ws) {
             return false;
@@ -259,7 +312,6 @@ window.addEventListener("load", function(evt) {
         }
         return false;
     };
-
     document.getElementById("send").onclick = function(evt) {
         if (!ws) {
             return false;
@@ -268,7 +320,6 @@ window.addEventListener("load", function(evt) {
         ws.send(input.value);
         return false;
     };
-
     document.getElementById("close").onclick = function(evt) {
         if (!ws) {
             return false;
@@ -276,15 +327,14 @@ window.addEventListener("load", function(evt) {
         ws.close();
         return false;
     };
-
 });
 </script>
 </head>
 <body>
 <table>
 <tr><td valign="top" width="50%">
-<p>Click "Open" to create a connection to the server,
-"Send" to send a message to the server and "Close" to close the connection.
+<p>Click "Open" to create a connection to the server-bak,
+"Send" to send a message to the server-bak and "Close" to close the connection.
 You can change the message and send multiple times.
 <p>
 <form>

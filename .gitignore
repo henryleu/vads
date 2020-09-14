@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+*.xml
 
 # Logs
 logs
@@ -23,9 +24,4 @@ logs
 
 # IDE files
 .vscode/
-/.idea
-将删除 hly/.idea/.gitignore
-将删除 hly/.idea/hly.iml
-将删除 hly/.idea/misc.xml
-将删除 hly/.idea/modules.xml
-将删除 hly/.idea/vcs.xml
+.idea/

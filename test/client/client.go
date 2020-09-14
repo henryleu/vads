@@ -6,11 +6,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-
-	"github.com/henryleu/vads/hly"
+	"vads/hly"
 )
 
-var addr = flag.String("addr", "localhost:6000", "http service address")
+var addr = flag.String("addr", "127.0.0.1:6000", "http service address")
+
+//var addr = flag.String("addr", "114.116.110.22:6000", "http service address")
 
 func main() {
 	flag.Parse()
@@ -25,12 +26,10 @@ func main() {
 		}
 	}()
 
-	u := url.URL{Scheme: "ws", Host: *addr, Path: "/mrcp"}
+	u := url.URL{Scheme: "ws", Host: *addr, Path: "/websocket/hly/calling"}
 	log.Printf("connecting to %s", u.String())
-	// fn := "../../data/8ef79f2695c811ea.wav"
-	fn := "../data/0ebb1c6895c611ea.wav"
-	// fn := "../data/tts-01.wav"
-
+	fn := "../../data/8ef79f2695c811ea.wav"
 	log.Printf("detecting %s", fn)
 	hly.ClientRequest(u.String(), fn)
+
 }
