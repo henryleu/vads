@@ -19,7 +19,7 @@ var upgrader = websocket.Upgrader{} // use default options
 const debug = true
 
 const requestTimeout = time.Second * 30
-const chunkTimeout = time.Second * 5
+const chunkTimeout = time.Second * 2
 const minFrameSize = 160 // 8000/1000*2*10
 const sampleRate = 8000
 const bytesPerSample = 2
@@ -29,7 +29,7 @@ const frameLen = frameDuration * 16
 // mock to load config from file on boot
 func getConfig() *vad.Config {
 	c := vad.NewDefaultConfig()
-	c.SilenceTimeout = 500   // 800 is the best value, test it before changing
+	c.SilenceTimeout = 800   // 800 is the best value, test it before changing
 	c.SpeechTimeout = 800    // 800 is the best value, test it before changing
 	c.NoinputTimeout = 20000 // nearly ignore noinput case
 	c.RecognitionTimeout = 10000
@@ -170,6 +170,7 @@ loop_chunk:
 			errMsg = fmt.Sprintf("fail 006 to get chunk msg, error = %v\n", err)
 			break loop_chunk
 		case <-time.After(chunkTimeout):
+			detector.Finalize()
 			errMsg = "fail 007 to get chunk msg, error = timeout\n"
 			break loop_chunk
 		}

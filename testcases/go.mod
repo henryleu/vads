@@ -9,6 +9,7 @@ require (
 	github.com/gopherjs/gopherwasm v1.1.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hajimehoshi/oto v0.6.4 // indirect
+	github.com/henryleu/vads v0.2.1
 	github.com/jmespath/go-jmespath v0.3.0 // indirect
 	github.com/json-iterator/go v1.1.10 // indirect
 	github.com/kirinlabs/HttpRequest v1.0.5 // indirect

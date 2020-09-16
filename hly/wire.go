@@ -9,7 +9,7 @@ import (
 	ws "github.com/gorilla/websocket"
 )
 
-const debugMessage = true
+const debugMessage = false
 
 // Time allowed to write a message to the peer.
 const writeWait = 10 * time.Second
