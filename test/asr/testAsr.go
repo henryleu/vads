@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"vads/hly/util"
+
+	"github.com/henryleu/hly/util"
 )
 
 func main() {

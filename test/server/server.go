@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"vads/hly"
+
+	"github.com/henryleu/vads/hly"
 )
 
 var addr = flag.String("addr", "0.0.0.0:6000", "http service address")
