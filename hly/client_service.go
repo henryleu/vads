@@ -6,7 +6,7 @@ import (
 	"log"
 
 	ws "github.com/gorilla/websocket"
-	wav "github.com/henryleu/vads/wav"
+	wav "github.com/henryleu/go-wav"
 )
 
 // ClientRequest is the handler for nlp+vad

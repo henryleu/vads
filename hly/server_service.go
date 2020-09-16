@@ -2,14 +2,12 @@ package hly
 
 import (
 	"fmt"
-	"vads/hly/util"
-	"vads/vad"
 
 	"github.com/gorilla/websocket"
+	"github.com/henryleu/go-vad"
+	"github.com/henryleu/vads/hly/util"
 
-	//vad "github.com/henryleu/vads/vad"
 	"log"
-	//log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"text/template"
