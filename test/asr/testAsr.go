@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/henryleu/hly/util"
+	"github.com/henryleu/vads/hly/util"
 )
 
 func main() {
