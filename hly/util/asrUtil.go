@@ -156,7 +156,7 @@ func AsrByAicyber(filePath string) (content string) {
 	 * 1.鉴权参数
 	 * 2.Content-Type：application/octet-stream
 	 */
-	req.SetHeaders(map[string]string{"Content-Type": "application/octet-stream"})
+	req.SetHeaders(map[string]string{"Content-Type": "application/octet-stream;rate=8000"})
 	req.SetHeaders(map[string]string{"Content-Length": strconv.Itoa(finLen)})
 	// POST 调用方法
 	resp, err := req.Post(httpUrl, string(fin))
