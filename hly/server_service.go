@@ -256,7 +256,7 @@ events_loop:
 	//	return
 	//}
 	//  todo 返回语音识别结果
-	asrText := util.AsrClient(voicePath)
+	asrText := util.AsrByAicyber(voicePath)
 	recog := Recognition{
 		AnswerText: "",
 		AudioText:  asrText,

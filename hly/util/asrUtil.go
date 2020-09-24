@@ -149,7 +149,7 @@ func AsrByAicyber(filePath string) (content string) {
 	 * TODO Step 002
 	 * 拼接asr识别地址
 	 */
-	httpUrl := "http://192.168.2.200:8080/aicyber/asr/gpu/stream/gpu/recognise/"
+	httpUrl := "http://127.0.0.1:8080/aicyber/asr/stream/v1/recognise/"
 	log.Print(httpUrl)
 	/**
 	 * 设置HTTP 头部字段
