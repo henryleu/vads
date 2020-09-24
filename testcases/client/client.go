@@ -32,7 +32,7 @@ func main() {
 	// fn := "../data/8ef79f2695c811ea.wav"
 	// fn := "../data/tts-01.wav"
 	fn := "../data/haichao_test_01.wav"
-
+	//todo 测试服务
 	log.Printf("detecting %s", fn)
 	hly.ClientRequest(u.String(), fn)
 
