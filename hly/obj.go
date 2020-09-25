@@ -1,6 +1,9 @@
 package hly
 
-import "encoding/base64"
+import (
+	"bytes"
+	"encoding/base64"
+)
 
 /*
 	基本信息
@@ -134,6 +137,16 @@ func (o *Chunk) DecodeAudio() error {
 	}
 	o.Data = data
 	return nil
+}
+
+// ValidateCoding compares data with data->encoded->decoded
+func (o *Chunk) ValidateCoding() bool {
+	encoded := base64.StdEncoding.EncodeToString(o.Data)
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return false
+	}
+	return bytes.Compare(o.Data, decoded) == 0
 }
 
 // Message creates a chunk Message

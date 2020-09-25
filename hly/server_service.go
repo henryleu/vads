@@ -2,6 +2,7 @@ package hly
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/gorilla/websocket"
 	"github.com/henryleu/go-vad"
@@ -10,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"text/template"
 	"time"
 )
 
@@ -29,11 +29,11 @@ const frameLen = frameDuration * 16
 // mock to load config from file on boot
 func getConfig() *vad.Config {
 	c := vad.NewDefaultConfig()
-	c.SilenceTimeout = 800   // 800 is the best value, test it before changing
-	c.SpeechTimeout = 800    // 800 is the best value, test it before changing
+	c.SilenceTimeout = 400   // 800 is the best value, test it before changing
+	c.SpeechTimeout = 400    // 800 is the best value, test it before changing
 	c.NoinputTimeout = 20000 // nearly ignore noinput case
 	c.RecognitionTimeout = 10000
-	c.VADLevel = 3     // 3 is the best value, test it before changing
+	c.VADLevel = 2     // 3 is the best value, test it before changing
 	c.Multiple = false // recognition mode
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	err := c.Validate()
@@ -41,6 +41,20 @@ func getConfig() *vad.Config {
 		log.Fatalf("Config.Validate() error = %v", err)
 	}
 	return c
+}
+
+func getVoiceDir() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Printf("fail to get wd, error: %v", err)
+		return "", err
+	}
+	dir := path.Join(cwd, "tmp")
+	_, err = os.Stat(dir)
+	if err != nil {
+		log.Printf("voice dir %q doesn't exist, error: %v", dir, err)
+	}
+	return dir, nil
 }
 
 func sendCloseMessage(c *websocket.Conn, code int, msg string) {
@@ -108,7 +122,7 @@ func HandleMRCP(w http.ResponseWriter, r *http.Request) {
 		wire.SendCloseMessage(websocket.CloseUnsupportedData, errMsg)
 		return
 	}
-
+	log.Println("BytesPerFrame", detector.BytesPerFrame())
 	chunkNo := 0
 loop_chunk:
 	for {
@@ -128,15 +142,9 @@ loop_chunk:
 				errMsg = fmt.Sprintf("fail 005 to decode chunk audio, error = %v\n", err)
 				break loop_chunk
 			}
-			cno := chunk.NO
-			//cno, err := strconv.Atoi(chunk.NO)
-			//if err != nil {
-			//	errMsg = fmt.Sprintf("fail to unmarshal chunk no (%v), error = %v\n", chunk.NO, err)
-			//	break loop_chunk
-			//}
 			chunkNo++
-			if chunkNo != cno {
-				errMsg = fmt.Sprintf("fail to validate chunk no, want %d, got %d\n", chunkNo, cno)
+			if chunkNo != chunk.NO {
+				errMsg = fmt.Sprintf("fail to validate chunk no, want %d, got %d\n", chunkNo, chunk.NO)
 				break loop_chunk
 			}
 			chunkSize := len(chunk.Data)
@@ -156,12 +164,14 @@ loop_chunk:
 				frame = data[:frameLen] // a slice with 320 bytes
 				data = data[frameLen:]
 				err := detector.Process(frame)
-				if !detector.Working() {
-					log.Printf("detector is stopped for session [%v] after %v chunks\n", chunk.CID, chunk.NO)
-					break loop_chunk
-				}
 				if err != nil {
 					errMsg = fmt.Sprintf("fail to process frame in chunk NO[%v] of session[%v], error = %v\n", chunk.NO, chunk.CID, err)
+					detector.Finalize()
+					break loop_chunk
+				}
+				if !detector.Working() {
+					log.Printf("detector is stopped for session [%v] after %v chunks\n", chunk.CID, chunk.NO)
+					detector.Finalize()
 					break loop_chunk
 				}
 			} // end loop frame
@@ -171,7 +181,7 @@ loop_chunk:
 			break loop_chunk
 		case <-time.After(chunkTimeout):
 			detector.Finalize()
-			errMsg = "fail 007 to get chunk msg, error = timeout\n"
+			// errMsg = "fail 007 to get chunk msg, error = timeout\n"
 			break loop_chunk
 		}
 	} // end loop chunk
@@ -183,7 +193,12 @@ loop_chunk:
 	}
 
 	// new a clip file name here
-	var voicePath string = "/mnt/voice/hly-%v-%v.wav"
+	voiceDir, _ := getVoiceDir()
+	fileTpl := "hly-%v-%v.wav"
+	voiceTpl := path.Join(voiceDir, fileTpl)
+	voicePath := ""
+	// var voicePath string = "/mnt/voice/hly-%v-%v.wav"
+
 	//var infoMsg = make(map[string]interface{})
 events_loop:
 	for e := range detector.Events {
@@ -199,14 +214,36 @@ events_loop:
 		case vad.EventVoiceEnd:
 			//f, err := ioutil.TempFile("", fmt.Sprintf("clip-%v-*.wav", req.CID))
 			t := time.Now()
-			voicePath = fmt.Sprintf(voicePath, req.CID, t.Format("20060102150405"))
+			log.Println(chunkNo)
+
+			// detected clip
+			voicePath = fmt.Sprintf(voiceTpl, req.CID, t.Format("20060102150405001"))
 			f, err := os.Create(voicePath)
 			if err != nil {
 				errMsg = fmt.Sprintf("fail to save clip, fs.Open() error = %v\n", err)
 				log.Print(errMsg)
 				break events_loop
 			}
-			e.Clip.SaveToWriter(f)
+			detector.Clip.SaveToWriter(f)
+			detector.Clip.PrintDetail()
+			log.Println("detector.SpeechTimeout", detector.SpeechTimeout)
+			log.Println("detector.SilenceTimeout", detector.SilenceTimeout)
+			log.Println("detector.BytesPerFrame", detector.BytesPerFrame())
+			log.Println("clip degest", detector.Clip.GenerateDigest())
+
+			// total clip
+			voicePath = fmt.Sprintf(voiceTpl, req.CID, t.Format("20060102150405002"))
+			f, err = os.Create(voicePath)
+			if err != nil {
+				errMsg = fmt.Sprintf("fail to save clip, fs.Open() error = %v\n", err)
+				log.Print(errMsg)
+				break events_loop
+			}
+			tc := detector.GetTotalClip()
+			tc.SaveToWriter(f)
+			tc.PrintDetail()
+			log.Println("total clip degest", tc.GenerateDigest())
+
 			log.Printf("succeed to save clip %v for session %v\n", f.Name(), req.CID)
 			break events_loop
 		case vad.EventNoinput:
@@ -270,81 +307,3 @@ events_loop:
 	}
 	sendCloseMessage(c, websocket.CloseNormalClosure, "")
 }
-
-// Home is the handler for testing in webrtc client
-func Home(w http.ResponseWriter, r *http.Request) {
-	homeTemplate.Execute(w, "ws://"+r.Host+"/mrcp")
-}
-
-var homeTemplate = template.Must(template.New("").Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<script>
-window.addEventListener("load", function(evt) {
-    var output = document.getElementById("output");
-    var input = document.getElementById("input");
-    var ws;
-    var print = function(message) {
-        var d = document.createElement("div");
-        d.textContent = message;
-        output.appendChild(d);
-    };
-    document.getElementById("open").onclick = function(evt) {
-        if (ws) {
-            return false;
-        }
-        ws = new WebSocket("{{.}}");
-        ws.onopen = function(evt) {
-            print("OPEN");
-        }
-        ws.onclose = function(evt) {
-            print("CLOSE");
-            ws = null;
-        }
-        ws.onmessage = function(evt) {
-            print("RESPONSE: " + evt.data);
-        }
-        ws.onerror = function(evt) {
-            print("ERROR: " + evt.data);
-        }
-        return false;
-    };
-    document.getElementById("send").onclick = function(evt) {
-        if (!ws) {
-            return false;
-        }
-        print("SEND: " + input.value);
-        ws.send(input.value);
-        return false;
-    };
-    document.getElementById("close").onclick = function(evt) {
-        if (!ws) {
-            return false;
-        }
-        ws.close();
-        return false;
-    };
-});
-</script>
-</head>
-<body>
-<table>
-<tr><td valign="top" width="50%">
-<p>Click "Open" to create a connection to the server-bak,
-"Send" to send a message to the server-bak and "Close" to close the connection.
-You can change the message and send multiple times.
-<p>
-<form>
-<button id="open">Open</button>
-<button id="close">Close</button>
-<p><input id="input" type="text" value="Hello world!">
-<button id="send">Send</button>
-</form>
-</td><td valign="top" width="50%">
-<div id="output"></div>
-</td></tr></table>
-</body>
-</html>
-`))

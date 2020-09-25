@@ -5,8 +5,9 @@ go 1.14
 require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.495
 	github.com/gorilla/websocket v1.4.2
-	github.com/henryleu/go-vad v0.0.0-20200916082812-a9fdc7056da5
+	github.com/henryleu/go-vad v0.0.0-20200925103050-5d9401650b7d
 	github.com/henryleu/go-wav v0.0.0-20200916035820-670a6e7b535b
+	github.com/henryleu/go-webrtcvad v0.0.0-20200925082944-0ae41bfc2df6 // indirect
 	github.com/jmespath/go-jmespath v0.3.0 // indirect
 	github.com/json-iterator/go v1.1.10 // indirect
 	github.com/kirinlabs/HttpRequest v1.0.5

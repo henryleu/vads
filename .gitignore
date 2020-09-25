@@ -25,3 +25,4 @@ logs
 # IDE files
 .vscode/
 .idea/
+tmp/*
